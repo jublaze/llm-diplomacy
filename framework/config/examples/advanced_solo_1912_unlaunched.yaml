@@ -1,0 +1,50 @@
+schema_version: "1.0"
+experiment_id: advanced_solo_1912_unlaunched
+dry_run: true
+agent_state_mode: fresh
+
+# Proposed roster and fixed country assignment are pending the user's cross-check.
+agents:
+  - agent_id: birsan
+    blueprint: blueprints/birsan.yaml
+    provider_config: {model_profile: openai_gpt_6_1_sol, reasoning_effort: low, max_output_tokens: 2000}
+  - agent_id: dolos
+    blueprint: blueprints/dolos.yaml
+    provider_config: {model_profile: openai_gpt_6_1_sol, reasoning_effort: low, max_output_tokens: 2000}
+  - agent_id: metternich
+    blueprint: blueprints/metternich.yaml
+    provider_config: {model_profile: openai_gpt_6_1_sol, reasoning_effort: low, max_output_tokens: 2000}
+  - agent_id: shaver
+    blueprint: blueprints/shaver.yaml
+    provider_config: {model_profile: openai_gpt_6_1_sol, reasoning_effort: low, max_output_tokens: 2000}
+  - agent_id: major
+    blueprint: blueprints/major.yaml
+    provider_config: {model_profile: openai_gpt_6_1_sol, reasoning_effort: low, max_output_tokens: 2000}
+  - agent_id: birsan_ii
+    blueprint: blueprints/birsan.yaml
+    provider_config: {model_profile: openai_gpt_6_1_sol, reasoning_effort: low, max_output_tokens: 2000}
+  - agent_id: major_ii
+    blueprint: blueprints/major.yaml
+    provider_config: {model_profile: openai_gpt_6_1_sol, reasoning_effort: low, max_output_tokens: 2000}
+
+runtime:
+  kind: baseline_llm
+  max_ticks: 3
+  llm_agent_ids: [birsan, dolos, metternich, shaver, major, birsan_ii, major_ii]
+
+games:
+  count: 1
+  max_year: 1912
+  country_assignment: fixed
+  seed: 20261016
+
+budget:
+  max_provider_calls: 3500
+  max_input_tokens: 20000000
+  max_output_tokens: 5000000
+  max_estimated_cost_usd: 75.0
+  stop_policy: stop_experiment
+
+outputs:
+  observatory: true
+  summary: true

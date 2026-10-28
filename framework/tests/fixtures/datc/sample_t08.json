@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0",
+  "case_id": "T08",
+  "title": "Basic convoy success",
+  "initial_state": {
+    "schema_version": "1.0",
+    "map_id": "standard",
+    "year": 1901,
+    "season": "spring",
+    "phase": "movement",
+    "units": [
+      {"schema_version": "1.0", "unit_id": "u_eng_a_lon", "owner": "england", "type": "A", "province": "lon", "coast": null, "status": "active"},
+      {"schema_version": "1.0", "unit_id": "u_eng_f_eng", "owner": "england", "type": "F", "province": "eng", "coast": null, "status": "active"}
+    ],
+    "supply_ownership": {},
+    "home_centers": {}
+  },
+  "orders": [
+    {"schema_version": "1.0", "order_id": "o_lon_bre_via_convoy", "unit_ref": "u_eng_a_lon", "power": "england", "type": "MOVE", "payload": {"from": "lon", "to": "bre", "via_convoy": true}},
+    {"schema_version": "1.0", "order_id": "o_eng_convoy_lon_bre", "unit_ref": "u_eng_f_eng", "power": "england", "type": "CONVOY", "payload": {"from": "eng", "army_from": "lon", "army_to": "bre"}}
+  ],
+  "expected": {
+    "movement_outcomes": {
+      "u_eng_a_lon": "moved"
+    },
+    "convoy_outcomes": {
+      "u_eng_a_lon": "possible"
+    }
+  }
+}

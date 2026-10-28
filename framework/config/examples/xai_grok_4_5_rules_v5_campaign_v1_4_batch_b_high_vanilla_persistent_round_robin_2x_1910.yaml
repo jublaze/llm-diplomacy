@@ -1,0 +1,52 @@
+schema_version: "1.0"
+experiment_id: xai_grok_4_5_rules_v5_campaign_v1_4_batch_b_high_vanilla_persistent_round_robin_2x_1910
+comparison_group: grok_4_5_high_rules_v5_campaign_v1_4_batch_b_vanilla_vs_advanced_persistent
+comparison_condition: vanilla_general_profiles_two_game_persistent_memory
+
+dry_run: false
+# With a dedicated --agents-root, fresh means clean before Game 1 only. The same
+# folios then remain available for the handoff from Game 1 to Game 2.
+agent_state_mode: fresh
+
+agents:
+  - blueprints/cassandra.yaml
+  - blueprints/dorian.yaml
+  - blueprints/marcellus.yaml
+  - blueprints/seraphine.yaml
+  - blueprints/helena.yaml
+  - blueprints/victor.yaml
+  - blueprints/selene.yaml
+
+runtime:
+  kind: baseline_llm
+  max_ticks: 1
+  llm_agent_ids:
+    - cassandra
+    - dorian
+    - marcellus
+    - seraphine
+    - helena
+    - victor
+    - selene
+  provider_config:
+    model_profile: xai_grok_4_5
+    reasoning_effort: high
+    max_output_tokens: 2000
+    timeout_seconds: 300
+
+games:
+  count: 2
+  max_year: 1910
+  country_assignment: round_robin
+  seed: 2036
+
+budget:
+  max_provider_calls: 2500
+  max_input_tokens: 80000000
+  max_output_tokens: 20000000
+  max_estimated_cost_usd: 150.0
+  stop_policy: stop_experiment
+
+outputs:
+  observatory: true
+  summary: true

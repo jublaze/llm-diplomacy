@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0",
+  "case_id": "T13",
+  "title": "Illegal terrain move substituted to hold",
+  "initial_state": {
+    "schema_version": "1.0",
+    "map_id": "standard",
+    "year": 1901,
+    "season": "spring",
+    "phase": "movement",
+    "units": [
+      {
+        "schema_version": "1.0",
+        "unit_id": "u_fra_a_par",
+        "owner": "france",
+        "type": "A",
+        "province": "par",
+        "coast": null,
+        "status": "active"
+      }
+    ],
+    "supply_ownership": {},
+    "home_centers": {}
+  },
+  "orders": [
+    {
+      "schema_version": "1.0",
+      "order_id": "o_par_eng",
+      "unit_ref": "u_fra_a_par",
+      "power": "france",
+      "type": "MOVE",
+      "payload": {
+        "from": "par",
+        "to": "eng"
+      }
+    }
+  ],
+  "expected": {
+    "movement_outcomes": {
+      "u_fra_a_par": "held"
+    }
+  }
+}

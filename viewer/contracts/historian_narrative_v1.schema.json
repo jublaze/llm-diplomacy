@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://llm-diplomacy.dev/contracts/historian_narrative_v1.schema.json",
+  "title": "Historian Narrative v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "narrative_id", "plan_id", "report_bundle_id", "report_sha256", "audience", "generator", "sections"],
+  "properties": {
+    "schema_version": { "const": "historian_narrative_v1" },
+    "narrative_id": { "type": "string", "minLength": 1 },
+    "plan_id": { "type": "string", "minLength": 1 },
+    "report_bundle_id": { "type": "string", "minLength": 1 },
+    "report_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "audience": { "enum": ["public", "omniscient_postgame"] },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adapter", "adapter_version", "prompt_profile_version"],
+      "properties": {
+        "adapter": { "type": "string", "minLength": 1 },
+        "adapter_version": { "type": "string", "minLength": 1 },
+        "prompt_profile_version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "sections": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["section_id", "phase_id", "heading", "claim_type", "claims"],
+        "properties": {
+          "section_id": { "type": "string", "minLength": 1 },
+          "phase_id": { "type": "string", "minLength": 1 },
+          "heading": { "type": "string", "minLength": 1 },
+          "claim_type": { "enum": ["public_fact", "attributed_private_assessment", "postgame_interpretation"] },
+          "claims": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/claim" } }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "citations"],
+      "properties": {
+        "text": { "type": "string", "minLength": 1 },
+        "citations": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/citation" } }
+      }
+    },
+    "citation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_ref", "label", "evidence_type", "visibility", "target"],
+      "properties": {
+        "source_ref": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "evidence_type": { "enum": ["public", "message", "private_record", "postgame"] },
+        "visibility": { "enum": ["public", "private", "omniscient_postgame"] },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "id"],
+          "properties": {
+            "type": { "enum": ["source", "message", "record", "order"] },
+            "id": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    }
+  }
+}

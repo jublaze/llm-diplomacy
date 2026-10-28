@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0",
+  "experiment_id": "mixed_llm_game_v1",
+  "games": 1,
+  "agents": [
+    {"agent_id": "agent_llm", "runtime_kind": "llm"},
+    {"agent_id": "agent_scripted_1", "runtime_kind": "scripted", "scripted_kind": "hold"},
+    {"agent_id": "agent_scripted_2", "runtime_kind": "scripted", "scripted_kind": "random_legal"},
+    {"agent_id": "agent_scripted_3", "runtime_kind": "scripted", "scripted_kind": "greedy_center"},
+    {"agent_id": "agent_scripted_4", "runtime_kind": "scripted", "scripted_kind": "hold"},
+    {"agent_id": "agent_scripted_5", "runtime_kind": "scripted", "scripted_kind": "random_legal"},
+    {"agent_id": "agent_scripted_6", "runtime_kind": "scripted", "scripted_kind": "hold"}
+  ],
+  "rule_engine": {"name": "diplomacy"},
+  "negotiation": {"max_ticks": 1},
+  "seed": 31,
+  "llm_provider": {
+    "kind": "openai_compatible",
+    "model": "gpt-4.1-mini",
+    "temperature": 0.2,
+    "max_output_tokens": 1200,
+    "timeout_seconds": 60
+  }
+}

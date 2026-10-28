@@ -1,0 +1,107 @@
+{
+  "t6i07_only_one_build_in_a_home_supply_center": {
+    "orders": [
+      [
+        "RUS: A mos build",
+        "Succeeds"
+      ],
+      [
+        "RUS: A mos build",
+        "Fails"
+      ]
+    ]
+  },
+  "t6j01_too_many_remove_orders": {
+    "occupiers": {
+      "par": "FRA"
+    }
+  },
+  "t6j02_removing_the_same_unit_twice": {
+    "occupiers": {
+      "par": "FRA",
+      "bre": "ENG",
+      "mar": "ITA"
+    },
+    "orders": [
+      [
+        "FRA: A par disband",
+        "Succeeds"
+      ],
+      [
+        "FRA: A par disband",
+        "Fails"
+      ]
+    ]
+  },
+  "t6h01_no_supports_during_retreat": {
+    "ignore": null,
+    "orders": {
+      "AUS: F tri -> alb": "Fails",
+      "AUS: A ser supports F tri -> alb": "Fails",
+      "TUR: F gre -> alb": "Fails"
+    }
+  },
+  "t6h02_no_supports_from_retreating_unit": {
+    "ignore": null,
+    "preceding_main_phase": {
+      "orders": {
+        "ENG: A lvp -> edi": "Succeeds",
+        "ENG: F yor supports A lvp -> edi": null,
+        "ENG: F nwy hold": "Fails",
+        "GER: A kie supports A ruh -> hol": null,
+        "GER: A ruh -> hol": "Succeeds",
+        "RUS: F edi hold": "Fails",
+        "RUS: A swe supports A fin -> nwy": null,
+        "RUS: A fin -> nwy": "Succeeds",
+        "RUS: F hol hold": "Fails"
+      }
+    },
+    "orders": {
+      "ENG: F nwy -> nth": "Fails",
+      "RUS: F edi -> nth": "Fails",
+      "RUS: F hol supports F edi -> nth": "Fails"
+    }
+  },
+  "t6h03_no_convoy_during_retreat": {
+    "ignore": null,
+    "preceding_main_phase": {
+      "orders": {
+        "ENG: F nth hold": "Succeeds",
+        "ENG: A hol hold": "Fails",
+        "GER: F kie supports A ruh -> hol": null,
+        "GER: A ruh -> hol": "Succeeds"
+      }
+    },
+    "orders": {
+      "ENG: A hol -> yor": "Fails",
+      "ENG: F nth convoys hol -> yor": "Fails"
+    }
+  },
+  "t6a05_move_to_own_sector_with_convoy": {
+    "orders": {
+      "ENG: F nth convoys yor -> yor": null,
+      "ENG: A yor -> yor": "Fails",
+      "ENG: A lvp supports A yor -> yor": "Fails",
+      "GER: F lon -> yor": "Succeeds",
+      "GER: A wal supports F lon -> yor": "Succeeds"
+    }
+  },
+  "t6b10_unit_ordered_with_wrong_coast": {
+    "orders": {
+      "FRA: F spa(nc) -> lyo": "Succeeds"
+    }
+  },
+  "t6b12_army_movement_with_coastal_specification": {
+    "orders": {
+      "FRA: A gas -> spa(nc)": "Succeeds"
+    }
+  },
+  "t6b15_supporting_foreign_unit_with_unspecified_coast": {
+    "orders": {
+      "FRA: F por supports F mao -> spa": null,
+      "ENG: F mao -> spa(nc)": "Fails",
+      "ITA: F lyo supports F wes -> spa(sc)": null,
+      "ITA: F wes -> spa(sc)": "Fails"
+    }
+  }
+}

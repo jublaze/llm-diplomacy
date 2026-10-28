@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0",
+  "case_id": "T07",
+  "title": "Self-dislodgement is blocked",
+  "initial_state": {
+    "schema_version": "1.0",
+    "map_id": "standard",
+    "year": 1901,
+    "season": "spring",
+    "phase": "movement",
+    "units": [
+      {"schema_version": "1.0", "unit_id": "u_ger_a_mun", "owner": "germany", "type": "A", "province": "mun", "coast": null, "status": "active"},
+      {"schema_version": "1.0", "unit_id": "u_ger_a_bur", "owner": "germany", "type": "A", "province": "bur", "coast": null, "status": "active"},
+      {"schema_version": "1.0", "unit_id": "u_ger_a_ruh", "owner": "germany", "type": "A", "province": "ruh", "coast": null, "status": "active"}
+    ],
+    "supply_ownership": {},
+    "home_centers": {}
+  },
+  "orders": [
+    {"schema_version": "1.0", "order_id": "o_mun_bur", "unit_ref": "u_ger_a_mun", "power": "germany", "type": "MOVE", "payload": {"from": "mun", "to": "bur"}},
+    {"schema_version": "1.0", "order_id": "o_ruh_support_mun_bur", "unit_ref": "u_ger_a_ruh", "power": "germany", "type": "SUPPORT_MOVE", "payload": {"from": "ruh", "supported_from": "mun", "supported_to": "bur"}},
+    {"schema_version": "1.0", "order_id": "o_bur_hold", "unit_ref": "u_ger_a_bur", "power": "germany", "type": "HOLD", "payload": {"at": "bur"}}
+  ],
+  "expected": {
+    "movement_outcomes": {
+      "u_ger_a_mun": "held",
+      "u_ger_a_bur": "held"
+    }
+  }
+}

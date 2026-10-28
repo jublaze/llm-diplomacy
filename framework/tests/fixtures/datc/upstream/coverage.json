@@ -1,0 +1,733 @@
+{
+  "schema_version": "1.0",
+  "official_cases": 164,
+  "source_cases": 171,
+  "supplemental_cases": 1,
+  "cases": {
+    "t6a01_move_to_non_neighbor_fails": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.A.1"
+    },
+    "t6a02_move_army_to_sea": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.A.2"
+    },
+    "t6a03_move_fleet_to_land": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.A.3"
+    },
+    "t6a04_move_to_own_sector": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.A.4"
+    },
+    "t6a05_move_to_own_sector_with_convoy": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.A.5"
+    },
+    "t6a06_ordering_a_unit_of_another_country": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.A.6"
+    },
+    "t6a07_only_armies_can_be_convoyed": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.A.7"
+    },
+    "t6a08_support_to_hold_yourself_is_not_possible": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.A.8"
+    },
+    "t6a09_fleets_must_follow_coast_if_not_on_sea": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.A.9"
+    },
+    "t6a10_support_on_unreachable_destination_not_possible": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.A.10"
+    },
+    "t6a11_simple_bounce": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.A.11"
+    },
+    "t6a12_bounce_of_three_units": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.A.12"
+    },
+    "t6b01_moving_without_required_coast_fails": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.B.1"
+    },
+    "t6b02_moving_with_unspecified_coast_when_coast_is_not_necessary": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.B.2"
+    },
+    "t6b03_moving_with_wrong_coast_when_coast_is_not_necessary": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.B.3"
+    },
+    "t6b04_support_to_unreachable_coast_allowed": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.B.4"
+    },
+    "t6b05_support_from_unreachable_coast_not_allowed": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.B.5"
+    },
+    "t6b06_support_can_be_cut_with_other_coast": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.B.6"
+    },
+    "t6b07_supporting_with_unspecified_coast": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.B.7"
+    },
+    "t6b08_supporting_with_unspecified_coast_when_only_one_coast_is_possible": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.B.8"
+    },
+    "t6b09_supporting_with_wrong_coast": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.B.9"
+    },
+    "t6b10_unit_ordered_with_wrong_coast": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.B.10"
+    },
+    "t6b11_coast_can_not_be_ordered_to_change": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.B.11"
+    },
+    "t6b12_army_movement_with_coastal_specification": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.B.12"
+    },
+    "t6b13_coastal_crawl_not_allowed": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.B.13"
+    },
+    "t6b14_building_with_unspecified_coast": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.B.14"
+    },
+    "t6b15_supporting_foreign_unit_with_unspecified_coast": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.B.15"
+    },
+    "t6c01_three_army_circular_movement_succeeds": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.C.1"
+    },
+    "t6c02_three_army_circular_movement_with_support": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.C.2"
+    },
+    "t6c03_a_disrupted_three_army_circular_movement": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.C.3"
+    },
+    "t6c04_a_circular_movement_with_attacked_convoy": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.C.4"
+    },
+    "t6c05_a_disrupted_circular_movement_due_to_dislodged_convoy": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.C.5"
+    },
+    "t6c06_two_armies_with_two_convoys": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.C.6"
+    },
+    "t6c07_disrupted_unit_swap": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.C.7"
+    },
+    "t6c08_no_self_dislodgement_in_disrupted_circular_movement": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.C.8"
+    },
+    "t6c09_no_help_in_dislodgement_of_own_unit_in_disrupted_circular_movement": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.C.9"
+    },
+    "t6d01_supported_hold_can_prevent_dislodgement": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.1"
+    },
+    "t6d02_a_move_cuts_support_on_hold": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.2"
+    },
+    "t6d03_a_move_cuts_support_on_move": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.3"
+    },
+    "t6d04_support_to_hold_on_unit_supporting_a_hold_allowed": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.4"
+    },
+    "t6d05_support_to_hold_on_unit_supporting_a_move_allowed": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.5"
+    },
+    "t6d06_support_to_hold_on_convoying_unit_allowed": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.6"
+    },
+    "t6d07_support_to_hold_on_moving_unit_not_allowed": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.7"
+    },
+    "t6d08_failed_convoy_can_not_receive_hold_support": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.8"
+    },
+    "t6d09_support_to_move_on_holding_unit_not_allowed": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.9"
+    },
+    "t6d10_self_dislodgment_prohibited": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.10"
+    },
+    "t6d11_no_self_dislodgment_of_returning_unit": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.11"
+    },
+    "t6d12_supporting_a_foreign_unit_to_dislodge_own_unit_prohibited": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.12"
+    },
+    "t6d13_supporting_a_foreign_unit_to_dislodge_a_returning_own_unit_prohibited": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.13"
+    },
+    "t6d14_supporting_a_foreign_unit_is_not_enough_to_prevent_dislodgement": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.14"
+    },
+    "t6d15_defender_can_not_cut_support_for_attack_on_itself": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.15"
+    },
+    "t6d17_dislodgement_cuts_supports": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.17"
+    },
+    "t6d18_a_surviving_unit_will_sustain_support": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.18"
+    },
+    "t6d19_even_when_surviving_is_in_alternative_way": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.19"
+    },
+    "t6d20_unit_can_not_cut_support_of_its_own_country": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.20"
+    },
+    "t6d21_dislodging_does_not_cancel_a_support_cut": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.21"
+    },
+    "t6d22_impossible_fleet_move_can_not_be_supported": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.22"
+    },
+    "t6d23_impossible_coast_move_can_not_be_supported": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.23"
+    },
+    "t6d24_impossible_army_move_can_not_be_supported": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.24"
+    },
+    "t6d25_failing_hold_support_can_be_supported": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.25"
+    },
+    "t6d26_failing_move_support_can_be_supported": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.26"
+    },
+    "t6d27_failing_convoy_can_be_supported": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.27"
+    },
+    "t6d28_impossible_move_and_support": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.28"
+    },
+    "t6d29_move_to_impossible_coast_and_support": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.29"
+    },
+    "t6d30_move_without_coast_and_support": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.30"
+    },
+    "t6d31_a_tricky_impossible_support": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.31"
+    },
+    "t6d32_a_missing_fleet": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.32"
+    },
+    "t6d33_unwanted_support_allowed": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.33"
+    },
+    "t6d34_support_targeting_own_area_not_allowed": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.34"
+    },
+    "t6e01_dislodged_unit_has_no_effect_on_attacker_area": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.E.1"
+    },
+    "t6e02_no_self_dislodgement_in_head_to_head_battle": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.E.2"
+    },
+    "t6e03_no_help_in_dislodging_own_unit": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.E.3"
+    },
+    "t6e04_non_dislodged_loser_has_still_effect": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.E.4"
+    },
+    "t6e05_loser_dislodged_by_another_army_has_still_effect": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.E.5"
+    },
+    "t6e06_not_dislodge_because_of_own_support_has_still_effect": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.E.6"
+    },
+    "t6e07_no_self_dislodgement_with_beleaguered_garrison": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.E.7"
+    },
+    "t6e08_no_self_dislodgement_with_beleaguered_garrison_and_head_to_head_battle": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.E.8"
+    },
+    "t6e09_almost_self_dislodgement_with_beleaguered_garrison": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.E.9"
+    },
+    "t6e10_almost_circular_movement_with_no_self_dislodgement_with_beleaguered_garrison": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.E.10"
+    },
+    "t6e11_no_self_dislodgement_with_beleaguered_garrison_unit_swap_with_adjacent_convoying_and_two_coasts": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.E.11"
+    },
+    "t6e12_support_on_attack_on_own_unit_can_be_used_for_other_means": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.E.12"
+    },
+    "t6e13_three_way_beleaguered_garrison": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.E.13"
+    },
+    "t6e14_illegal_head_to_head_battle_can_still_defend": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.E.14"
+    },
+    "t6e15_the_friendly_head_to_head_battle": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.E.15"
+    },
+    "t6f01_no_convoy_in_coastal_areas": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.F.1"
+    },
+    "t6f02_an_army_being_convoyed_can_bounce_as_normal": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.F.2"
+    },
+    "t6f03_an_army_being_convoyed_can_receive_support": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.F.3"
+    },
+    "t6f04_an_attacked_convoy_is_not_disrupted": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.F.4"
+    },
+    "t6f05_a_beleaguered_convoy_is_not_disrupted": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.F.5"
+    },
+    "t6f06_dislodged_convoy_does_not_cut_support": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.F.6"
+    },
+    "t6f07_dislodged_convoy_does_not_cause_contested_area": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.F.7"
+    },
+    "t6f08_dislodged_convoy_does_not_cause_a_bounce": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.F.8"
+    },
+    "t6f09_dislodge_of_multi_route_convoy": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.F.9"
+    },
+    "t6f10_dislodge_of_multi_route_convoy_with_foreign_fleet": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.F.10"
+    },
+    "t6f11_dislodge_of_multi_route_convoy_with_only_foreign_fleets": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.F.11"
+    },
+    "t6f12_dislodged_convoying_fleet_not_on_route": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.F.12"
+    },
+    "t6f13_the_unwanted_alternative": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.F.13"
+    },
+    "t6f14_simple_convoy_paradox": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.F.14"
+    },
+    "t6f15_simple_convoy_paradox_with_additional_convoy": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.F.15"
+    },
+    "t6f16_pandins_paradox": {
+      "status": "policy_deviation",
+      "reason": "DIPLOMACY_RULE_SPEC.md existing project convoy policy: Independent army freeze: excluding BRE preserves ENG through equal supported attacks; BRE may cut LON after route freeze.",
+      "mismatch": "t6f16_pandins_paradox_006 expected=fails actual=succeeds",
+      "result_sha256": "37eb3f75c3f05232b6fa3b756388f0b2859e09ee328da7b895bf8b5910ab2a6a",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.F.16"
+    },
+    "t6f17_pandins_extended_paradox": {
+      "status": "policy_deviation",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.F.17",
+      "reason": "DIPLOMACY_RULE_SPEC.md existing project convoy policy: Independent army freeze: excluding BRE also excludes its dislodgement of LON; equal WAL/BEL attacks preserve ENG before freeze.",
+      "mismatch": "t6f17_pandins_extended_paradox_003 expected=fails actual=succeeds",
+      "result_sha256": "f076f726a271524e95bb3bc7631061d9e43c9b8fc995b7a532bf1a4326b7b53e"
+    },
+    "t6f18_betrayal_paradox": {
+      "status": "policy_deviation",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.F.18",
+      "reason": "DIPLOMACY_RULE_SPEC.md existing project convoy policy: Independent army freeze: excluding LON retains BEL support for NTH, preserving the route before LON cuts and dislodges BEL.",
+      "mismatch": "t6f18_betrayal_paradox_002 expected=fails actual=succeeds",
+      "result_sha256": "cfd2bf635e72c61bfcb638b2c8193a7e9ebb67342d3eae6e21f8def39e6c1020"
+    },
+    "t6f19_multi_route_convoy_disruption_paradox": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.F.19"
+    },
+    "t6f20_unwanted_multi_route_convoy_paradox": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.F.20"
+    },
+    "t6f21_dads_army_convoy": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.F.21"
+    },
+    "t6f22_second_order_paradox_with_two_resolutions": {
+      "status": "policy_deviation",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.F.22",
+      "reason": "DIPLOMACY_RULE_SPEC.md existing project convoy policy: Per-army fixed point starts with matching routes available. Each other army cuts support independently, preserving both routes; this converges without fallback.",
+      "mismatch": "t6f22_second_order_paradox_with_two_resolutions_001 expected=succeeds actual=fails",
+      "result_sha256": "dccf38715d35d49a4fed6b42a3435996e9ffbb3be105cba8d3e3af6157aa3bf4"
+    },
+    "t6f23_second_order_paradox_with_two_exclusive_convoys": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.F.23"
+    },
+    "t6f24_second_order_paradox_with_no_resolution": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.F.24"
+    },
+    "t6f25_cut_support_last": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.F.25"
+    },
+    "t6g01_two_units_can_swap_provinces_by_convoy": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.1"
+    },
+    "t6g02_kidnapping_an_army_1971": {
+      "status": "historical_alternative",
+      "reason": "source edition 1971 is a historical alternative, not the selected corpus expectation",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.2"
+    },
+    "t6g02_kidnapping_an_army_1982": {
+      "status": "historical_alternative",
+      "reason": "source edition 1982 is a historical alternative, not the selected corpus expectation",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.2"
+    },
+    "t6g03_unwanted_disrupted_convoy_to_adjacent_province": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.3"
+    },
+    "t6g04_unwanted_disrupted_convoy_to_adjacent_province_and_opposite_move_1971": {
+      "status": "historical_alternative",
+      "reason": "source edition 1971 is a historical alternative, not the selected corpus expectation",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.4"
+    },
+    "t6g04_unwanted_disrupted_convoy_to_adjacent_province_and_opposite_move_1982": {
+      "status": "historical_alternative",
+      "reason": "source edition 1982 is a historical alternative, not the selected corpus expectation",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.4"
+    },
+    "t6g05_swapping_with_intent": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.5"
+    },
+    "t6g06_swapping_with_unintended_intent": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.6"
+    },
+    "t6g07_swapping_with_illegal_intent_1971": {
+      "status": "historical_alternative",
+      "reason": "source edition 1971 is a historical alternative, not the selected corpus expectation",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.7"
+    },
+    "t6g07_swapping_with_illegal_intent_2023": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.7"
+    },
+    "t6g07_swapping_with_illegal_intent_dptg": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.7"
+    },
+    "t6g08_explicit_convoy_that_isnt_there": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.8"
+    },
+    "t6g09_swapped_or_dislodged": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.9"
+    },
+    "t6g10_swapped_or_an_head_to_head_battle": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.10"
+    },
+    "t6g11_a_convoy_to_an_adjacent_place_with_a_paradox": {
+      "status": "adapter_limitation",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.11",
+      "reason": "Adapter limitation, not a gameplay policy: source case omits explicit adjacent convoy intent, but the converter infers via_convoy from a matching own-country convoy order. The resulting engine input differs from the source notation and yields the recorded outcome.",
+      "mismatch": "t6g11_a_convoy_to_an_adjacent_place_with_a_paradox_002 expected=fails actual=succeeds",
+      "result_sha256": "62516dfb828388739159ff73925e738e84c349fae015a8a3b2a3306c9616c2a8"
+    },
+    "t6g11_variant_an_explicit_convoy_to_an_adjacent_place_with_a_paradox": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.11"
+    },
+    "t6g12_swapping_two_units_with_two_convoys": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.12"
+    },
+    "t6g13_support_cut_on_attack_on_itself_via_convoy": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.13"
+    },
+    "t6g14_bounce_by_convoy_to_adjacent_place": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.14"
+    },
+    "t6g15_bounce_and_dislodge_with_double_convoy": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.15"
+    },
+    "t6g16_the_two_unit_in_one_area_bug_moving_by_convoy": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.16"
+    },
+    "t6g17_the_two_unit_in_one_area_bug_moving_over_land": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.17"
+    },
+    "t6g18_the_two_unit_in_one_area_bug_with_double_convoy": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.18"
+    },
+    "t6g19_swapping_with_intent_of_unnecessary_convoy_1971": {
+      "status": "historical_alternative",
+      "reason": "source edition 1971 is a historical alternative, not the selected corpus expectation",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.19"
+    },
+    "t6g19_swapping_with_intent_of_unnecessary_convoy_2023": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.19"
+    },
+    "t6g20_explicit_convoy_to_adjacent_province_disrupted": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.G.20"
+    },
+    "t6h01_no_supports_during_retreat": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.H.1"
+    },
+    "t6h02_no_supports_from_retreating_unit": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.H.2"
+    },
+    "t6h03_no_convoy_during_retreat": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.H.3"
+    },
+    "t6h04_no_other_moves_during_retreat": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.H.4"
+    },
+    "t6h05_a_unit_may_not_retreat_to_the_area_from_which_it_is_attacked": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.H.5"
+    },
+    "t6h06_unit_may_not_retreat_to_a_contested_area": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.H.6"
+    },
+    "t6h07_multiple_retreat_to_same_area_will_disband_units": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.H.7"
+    },
+    "t6h08_triple_retreat_to_same_area_will_disband_units": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.H.8"
+    },
+    "t6h09_dislodged_unit_will_not_make_attackers_area_contested": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.H.9"
+    },
+    "t6h10_not_retreating_to_attacker_does_not_mean_contested": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.H.10"
+    },
+    "t6h11_retreat_when_dislodged_by_adjacent_convoy": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.H.11"
+    },
+    "t6h12_retreat_when_dislodged_by_adjacent_convoy_while_trying_to_do_the_same": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.H.12"
+    },
+    "t6h13_no_retreat_with_convoy_in_main_phase": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.H.13"
+    },
+    "t6h14_no_retreat_with_support_in_main_phase": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.H.14"
+    },
+    "t6h15_no_coastal_crawl_in_retreat": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.H.15"
+    },
+    "t6h16_contested_for_both_coasts": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.H.16"
+    },
+    "t6i01_too_many_build_orders": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.I.1"
+    },
+    "t6i02_fleets_can_not_be_build_in_land_areas": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.I.2"
+    },
+    "t6i03_supply_center_must_be_empty_for_building": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.I.3"
+    },
+    "t6i04_both_coasts_must_be_empty_for_building": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.I.4"
+    },
+    "t6i05_building_in_home_supply_center_that_is_not_owned": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.I.5"
+    },
+    "t6i06_building_in_owned_supply_center_that_is_not_a_home_supply_center": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.I.6"
+    },
+    "t6i07_only_one_build_in_a_home_supply_center": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.I.7"
+    },
+    "t6j01_too_many_remove_orders": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.J.1"
+    },
+    "t6j02_removing_the_same_unit_twice": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.J.2"
+    },
+    "t6j03_civil_disorder_two_armies_with_different_distance_2023": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.J.3"
+    },
+    "t6j04_civil_disorder_two_armies_with_equal_distance_2023": {
+      "status": "policy_deviation",
+      "reason": "DIPLOMACY_RULE_SPEC.md Disband default: distance to OWNED HOME centers on unit-legal graph, then largest province ID and unit ID; DATC2023 uses owned centers, army/fleet priorities and convoy distances.",
+      "mismatch": "t6j04_civil_disorder_two_armies_with_equal_distance_civil_001 expected=succeeds actual=fails",
+      "result_sha256": "cac274bb25b93c05f6fbc6cad7f42e12bfa3d99a8628e601cd2d6289f80d3729",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.J.4"
+    },
+    "t6j05_civil_disorder_two_fleets_with_different_distance_2023": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.J.5"
+    },
+    "t6j06_civil_disorder_two_fleets_with_equal_distance_2023": {
+      "status": "policy_deviation",
+      "reason": "DIPLOMACY_RULE_SPEC.md Disband default: distance to OWNED HOME centers on unit-legal graph, then largest province ID and unit ID; DATC2023 uses owned centers, army/fleet priorities and convoy distances.",
+      "mismatch": "t6j06_civil_disorder_two_fleets_with_equal_distance_civil_001 expected=succeeds actual=fails",
+      "result_sha256": "8c347c0f9422108292d1de4cb1446bd03c0282cb37ae72c4acd8cacd94c8b41b",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.J.6"
+    },
+    "t6j07_civil_disorder_two_fleets_and_army_with_equal_distance_2023": {
+      "status": "policy_deviation",
+      "reason": "DIPLOMACY_RULE_SPEC.md Disband default: distance to OWNED HOME centers on unit-legal graph, then largest province ID and unit ID; DATC2023 uses owned centers, army/fleet priorities and convoy distances.",
+      "mismatch": "t6j07_civil_disorder_two_fleets_and_army_with_equal_distance_civil_001 expected=succeeds actual=fails",
+      "result_sha256": "438ea0a2624351a17c26cbfc419accea6b83504337324824481238aa76309e9f",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.J.7"
+    },
+    "t6j08_civil_disorder_a_fleet_with_shorter_distance_then_the_army_2023": {
+      "status": "policy_deviation",
+      "reason": "DIPLOMACY_RULE_SPEC.md Disband default: distance to OWNED HOME centers on unit-legal graph, then largest province ID and unit ID; DATC2023 uses owned centers, army/fleet priorities and convoy distances.",
+      "mismatch": "t6j08_civil_disorder_a_fleet_with_shorter_distance_then_the_army_civil_001 expected=succeeds actual=fails",
+      "result_sha256": "fc46aeb5c2815bb4fbf3c02e8eae6c6ca56527703d63a8cf101fb55212854132",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.J.8"
+    },
+    "t6j09_civil_disorder_must_be_counted_from_both_coasts_2023": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.J.9"
+    },
+    "t6j10_civil_disorder_must_be_counted_from_both_coasts_second_scenario_2023": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.J.10"
+    },
+    "t6j11_civil_disorder_counting_convoying_distance_2023": {
+      "status": "policy_deviation",
+      "reason": "DIPLOMACY_RULE_SPEC.md Disband default: distance to OWNED HOME centers on unit-legal graph, then largest province ID and unit ID; DATC2023 uses owned centers, army/fleet priorities and convoy distances.",
+      "mismatch": "t6j11_civil_disorder_counting_convoying_distance_civil_001 expected=succeeds actual=fails",
+      "result_sha256": "73a1ea89b37d925a08a999bad0a52634a57079184783c6afee84fe57f59c6057",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.J.10"
+    },
+    "t6j12_distance_to_owned_supply_center_1971": {
+      "status": "historical_alternative",
+      "reason": "source edition 1971 is a historical alternative, not the selected corpus expectation",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.J.11"
+    },
+    "t6j12_distance_to_owned_supply_center_2023": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.J.11"
+    },
+    "t6d16_convoy_dislodging_own_unit": {
+      "status": "pass",
+      "official_reference": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.16"
+    }
+  }
+}

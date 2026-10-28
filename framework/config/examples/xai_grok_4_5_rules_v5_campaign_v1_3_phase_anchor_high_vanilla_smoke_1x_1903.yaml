@@ -1,0 +1,50 @@
+schema_version: "1.0"
+experiment_id: xai_grok_4_5_rules_v5_campaign_v1_3_phase_anchor_high_vanilla_smoke_1x_1903
+comparison_group: grok_4_5_high_rules_v5_campaign_v1_3_phase_anchor_smoke
+comparison_condition: vanilla_general_agents
+
+dry_run: false
+agent_state_mode: fresh
+
+agents:
+  - blueprints/cassandra.yaml
+  - blueprints/dorian.yaml
+  - blueprints/marcellus.yaml
+  - blueprints/seraphine.yaml
+  - blueprints/helena.yaml
+  - blueprints/victor.yaml
+  - blueprints/selene.yaml
+
+runtime:
+  kind: baseline_llm
+  max_ticks: 1
+  llm_agent_ids:
+    - cassandra
+    - dorian
+    - marcellus
+    - seraphine
+    - helena
+    - victor
+    - selene
+  provider_config:
+    model_profile: xai_grok_4_5
+    reasoning_effort: high
+    max_output_tokens: 2000
+    timeout_seconds: 300
+
+games:
+  count: 1
+  max_year: 1903
+  country_assignment: round_robin
+  seed: 2034
+
+budget:
+  max_provider_calls: 400
+  max_input_tokens: 5000000
+  max_output_tokens: 1000000
+  max_estimated_cost_usd: 35.0
+  stop_policy: stop_experiment
+
+outputs:
+  observatory: true
+  summary: true

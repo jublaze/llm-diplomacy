@@ -1,0 +1,47 @@
+schema_version: "1.0"
+experiment_id: per_player_2x2_offline_1901
+agent_state_mode: fresh
+dry_run: false
+
+# Four test players: two souls crossed with two offline fake models.
+agents:
+  - agent_id: cassandra_model_a
+    blueprint: blueprints/cassandra.yaml
+    provider_config: {kind: fake, model: fake-model-a}
+  - agent_id: cassandra_model_b
+    blueprint: blueprints/cassandra.yaml
+    provider_config: {kind: fake, model: fake-model-b}
+  - agent_id: dorian_model_a
+    blueprint: blueprints/dorian.yaml
+    provider_config: {kind: fake, model: fake-model-a}
+  - agent_id: dorian_model_b
+    blueprint: blueprints/dorian.yaml
+    provider_config: {kind: fake, model: fake-model-b}
+  # Scripted fill-ins keep one player per power on the standard seven-power map.
+  - blueprints/marcellus.yaml
+  - blueprints/seraphine.yaml
+  - blueprints/helena.yaml
+
+runtime:
+  kind: baseline_llm
+  provider: fake
+  max_ticks: 1
+  llm_agent_ids:
+    - cassandra_model_a
+    - cassandra_model_b
+    - dorian_model_a
+    - dorian_model_b
+
+games:
+  count: 1
+  max_year: 1901
+  country_assignment: fixed
+  seed: 20260917
+
+budget:
+  max_provider_calls: 200
+  stop_policy: stop_experiment
+
+outputs:
+  observatory: true
+  summary: true

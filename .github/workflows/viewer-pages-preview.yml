@@ -1,0 +1,35 @@
+name: Build viewer Pages candidate
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: viewer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: viewer/package-lock.json
+      - run: npm ci --ignore-scripts
+      - name: Generate synthetic public content
+        run: node --experimental-strip-types scripts/build_public_demo.ts public-build-demo
+      - name: Stage only public content
+        run: node --experimental-strip-types scripts/public_build.ts stage --source-root public-build-demo --output-root public-build-input
+      - name: Test and build for a project site
+        env:
+          PUBLIC_BASE_PATH: /${{ github.event.repository.name }}/
+        run: |
+          npm test
+          npm run build:public
+          npm run verify:public-build
+          touch dist-public/.nojekyll
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: viewer/dist-public
+    # Artifact preparation only. No deploy job or Pages write permissions.

@@ -1,0 +1,9 @@
+{
+  "policy_version": "diplomacy_full_postgame_release_v1",
+  "report_sha256": "692ffe3c4cb237b8fc49130f2d623a77b095901144e0b9100a8de06b1c37bca3",
+  "receipt_sha256": "2f6acbb3a1e028e530589c60ccad656cbfa0ed830566f96846ba53ddd889bbd6",
+  "asset_sha256": "7a0dd9e6d680456c875ebdf449040ed9b484a02939bda0c84a3b3d62f682b923",
+  "asset_bytes": 1052411,
+  "asset_name": "luna1912-full-postgame-v1.zip",
+  "release_tag": "luna1912-full-postgame-v1"
+}

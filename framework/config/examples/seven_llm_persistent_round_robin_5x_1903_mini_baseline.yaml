@@ -1,0 +1,53 @@
+schema_version: "1.0"
+experiment_id: seven_llm_persistent_round_robin_5x_1903_mini_baseline
+
+dry_run: false
+agent_state_mode: reuse
+
+agents:
+  - blueprints/cassandra.yaml
+  - blueprints/dorian.yaml
+  - blueprints/marcellus.yaml
+  - blueprints/seraphine.yaml
+  - blueprints/helena.yaml
+  - blueprints/victor.yaml
+  - blueprints/selene.yaml
+
+runtime:
+  kind: baseline_llm
+  provider: openai_compatible
+  max_ticks: 1
+  llm_agent_ids:
+    - cassandra
+    - dorian
+    - marcellus
+    - seraphine
+    - helena
+    - victor
+    - selene
+  provider_config:
+    kind: openai_compatible
+    model: gpt-4.1-mini
+    temperature: 0.2
+    max_output_tokens: 700
+    timeout_seconds: 90
+    pricing:
+      input_cost_per_1k_tokens: 0.0003
+      output_cost_per_1k_tokens: 0.0012
+
+games:
+  count: 5
+  max_year: 1903
+  country_assignment: round_robin
+  seed: 19035
+
+budget:
+  max_provider_calls: 2200
+  max_input_tokens: 6500000
+  max_output_tokens: 900000
+  max_estimated_cost_usd: 10.00
+  stop_policy: stop_game_after_phase
+
+outputs:
+  observatory: true
+  summary: true

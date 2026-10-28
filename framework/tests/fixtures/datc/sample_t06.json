@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "case_id": "T06",
+  "title": "Dislodged supporter does not contribute",
+  "initial_state": {
+    "schema_version": "1.0",
+    "map_id": "standard",
+    "year": 1901,
+    "season": "spring",
+    "phase": "movement",
+    "units": [
+      {"schema_version": "1.0", "unit_id": "u_ger_a_mun", "owner": "germany", "type": "A", "province": "mun", "coast": null, "status": "active"},
+      {"schema_version": "1.0", "unit_id": "u_ger_a_ruh", "owner": "germany", "type": "A", "province": "ruh", "coast": null, "status": "active"},
+      {"schema_version": "1.0", "unit_id": "u_fra_a_bur", "owner": "france", "type": "A", "province": "bur", "coast": null, "status": "active"},
+      {"schema_version": "1.0", "unit_id": "u_fra_a_bel", "owner": "france", "type": "A", "province": "bel", "coast": null, "status": "active"},
+      {"schema_version": "1.0", "unit_id": "u_ita_a_mar", "owner": "italy", "type": "A", "province": "mar", "coast": null, "status": "active"}
+    ],
+    "supply_ownership": {},
+    "home_centers": {}
+  },
+  "orders": [
+    {"schema_version": "1.0", "order_id": "o_mun_bur", "unit_ref": "u_ger_a_mun", "power": "germany", "type": "MOVE", "payload": {"from": "mun", "to": "bur"}},
+    {"schema_version": "1.0", "order_id": "o_ruh_support_mun_bur", "unit_ref": "u_ger_a_ruh", "power": "germany", "type": "SUPPORT_MOVE", "payload": {"from": "ruh", "supported_from": "mun", "supported_to": "bur"}},
+    {"schema_version": "1.0", "order_id": "o_bur_ruh", "unit_ref": "u_fra_a_bur", "power": "france", "type": "MOVE", "payload": {"from": "bur", "to": "ruh"}},
+    {"schema_version": "1.0", "order_id": "o_bel_support_bur_ruh", "unit_ref": "u_fra_a_bel", "power": "france", "type": "SUPPORT_MOVE", "payload": {"from": "bel", "supported_from": "bur", "supported_to": "ruh"}},
+    {"schema_version": "1.0", "order_id": "o_mar_bur", "unit_ref": "u_ita_a_mar", "power": "italy", "type": "MOVE", "payload": {"from": "mar", "to": "bur"}}
+  ],
+  "expected": {
+    "movement_outcomes": {
+      "u_ger_a_mun": "held",
+      "u_ger_a_ruh": "dislodged"
+    },
+    "support_outcomes": {
+      "u_ger_a_ruh": "dislodged"
+    }
+  }
+}

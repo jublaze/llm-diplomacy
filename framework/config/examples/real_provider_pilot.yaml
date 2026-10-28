@@ -1,0 +1,47 @@
+schema_version: "1.0"
+experiment_id: real_provider_pilot
+
+dry_run: false
+agent_state_mode: fresh
+
+agents:
+  - blueprints/cassandra.yaml
+  - blueprints/dorian.yaml
+  - blueprints/marcellus.yaml
+  - blueprints/seraphine.yaml
+  - blueprints/helena.yaml
+  - blueprints/victor.yaml
+  - blueprints/selene.yaml
+
+runtime:
+  kind: baseline_llm
+  provider: openai_compatible
+  max_ticks: 1
+  llm_agent_ids:
+    - cassandra
+  provider_config:
+    kind: openai_compatible
+    model: gpt-4.1-mini
+    temperature: 0.2
+    max_output_tokens: 400
+    timeout_seconds: 60
+    pricing:
+      input_cost_per_1k_tokens: 0.0003
+      output_cost_per_1k_tokens: 0.0012
+
+games:
+  count: 1
+  max_year: 1901
+  country_assignment: fixed
+  seed: 2026
+
+budget:
+  max_provider_calls: 60
+  max_input_tokens: 50000
+  max_output_tokens: 12000
+  max_estimated_cost_usd: 5.0
+  stop_policy: stop_experiment
+
+outputs:
+  observatory: true
+  summary: true

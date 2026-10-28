@@ -1,0 +1,23 @@
+id: openai_gpt_6_1_sol
+provider_name: openai
+api_style: responses
+model: gpt-6.1-sol
+base_url: https://api.openai.com/v1
+api_key_env_var: LLM_DIPLOMACY_OPENAI_API_KEY
+supports_temperature: false
+supports_reasoning_effort: true
+reasoning_effort_values:
+  - low
+  - medium
+  - high
+  - xhigh
+  - max
+reasoning_effort_param_style: nested_reasoning
+default_reasoning_effort: low
+supports_max_output_tokens: true
+input_cost_per_1k_tokens: 0.002
+output_cost_per_1k_tokens: 0.010
+notes: >-
+  Standard uncached input/output estimates based on the OpenAI API model and pricing pages as checked 2026-10-16.
+  Cached-input, cache-write, long-context, service-tier, and regional prices are not represented by these fields;
+  cost estimates are not a hard spend ceiling. Recheck current pricing and final usage limits before any launch.

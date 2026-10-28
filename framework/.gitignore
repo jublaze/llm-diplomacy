@@ -1,0 +1,91 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+.env/
+.env
+.env.*
+!.env.example
+!**/.env.example
+/standalone.env
+*.local.env
+
+# IDE/editor
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local agent/runtime state
+.codex/
+.agents/
+/.aws/
+**/.aws/
+
+# Secrets and credentials
+*.key
+*.pem
+*.p12
+*.pfx
+secrets.*
+
+# Experiment outputs (large/generated/sensitive)
+experiments/*
+!experiments/.gitkeep
+!experiments/configs/
+!experiments/configs/*.yaml
+
+# Runtime state; keep authored blueprints and config/ visible.
+/agent_state/
+/agents/
+/agents_*/
+/logs/
+/run_logs/
+/run-output/
+/agents/*/persistent_memory.md
+/agents/*/runtime/
+/agents/*/logs/
+/agents/*/memory/*.jsonl
+
+# Local builds and installed dependencies.
+/node_modules/
+**/node_modules/
+/viewer/dist/
+/viewer/dist-public/
+/viewer/coverage/
+/viewer/public/reports/
+/viewer/public/catalog/
+/viewer/fixtures/
+/viewer/public-build-input/
+/viewer/public-build-input-*/
+/viewer/public-build-demo/
+/viewer/public-build-audits/
+/viewer/test-results/
+/viewer/playwright-report/
+/viewer/exports/
+/viewer/local-history/
+/viewer/docs/reproducibility/
+/viewer/tests/e2e/*-snapshots/
+/dist/
+/dist-public/
+/build/
+/coverage/
+*.egg-info/
+.tox/
+
+# Logs/artifacts
+*.log
+*.tmp
+
+# Local build-loop audit record retained in the working tree
+/docs/BUILD_LOOP_20261015.md

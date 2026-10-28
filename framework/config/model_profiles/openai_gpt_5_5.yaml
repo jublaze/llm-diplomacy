@@ -1,0 +1,18 @@
+id: openai_gpt_5_5
+provider_name: openai
+api_style: responses
+model: gpt-5.5
+base_url: https://api.openai.com/v1
+api_key_env_var: LLM_DIPLOMACY_OPENAI_API_KEY
+supports_temperature: false
+supports_reasoning_effort: true
+reasoning_effort_values:
+  - low
+  - medium
+  - high
+reasoning_effort_param_style: nested_reasoning
+default_reasoning_effort: medium
+supports_max_output_tokens: true
+input_cost_per_1k_tokens: null
+output_cost_per_1k_tokens: null
+notes: "OpenAI Responses API reasoning model profile. Pricing may be filled later."

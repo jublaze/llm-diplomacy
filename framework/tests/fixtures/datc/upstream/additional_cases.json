@@ -1,0 +1,13 @@
+[
+  {
+    "name": "t6d16_convoy_dislodging_own_unit",
+    "url": "https://webdiplomacy.net/doc/DATC_v3_0.html#6.D.16",
+    "phase": "Main",
+    "orders": {
+      "ENG: A lon hold": "Fails",
+      "ENG: F nth convoys bel -> lon": "Succeeds",
+      "FRA: F eng supports A bel -> lon": "Succeeds",
+      "FRA: A bel -> lon": "Succeeds"
+    }
+  }
+]

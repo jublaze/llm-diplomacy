@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://llm-diplomacy.dev/contracts/narrative_plan_v1.schema.json",
+  "title": "Narrative Plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "plan_id", "report_bundle_id", "report_sha256", "audience", "generator", "phases"],
+  "properties": {
+    "schema_version": { "const": "narrative_plan_v1" },
+    "plan_id": { "type": "string", "minLength": 1 },
+    "report_bundle_id": { "type": "string", "minLength": 1 },
+    "report_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "audience": { "enum": ["public", "omniscient_postgame"] },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generator_version", "prompt_profile_version"],
+      "properties": {
+        "generator_version": { "type": "string", "minLength": 1 },
+        "prompt_profile_version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "phases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["phase_id", "year", "season", "kind", "source_ids", "allowed_targets", "observations"],
+        "properties": {
+          "phase_id": { "type": "string", "minLength": 1 },
+          "year": { "type": "integer" },
+          "season": { "type": "string", "minLength": 1 },
+          "kind": { "type": "string", "minLength": 1 },
+          "source_ids": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+          "allowed_targets": { "type": "array", "items": { "$ref": "#/$defs/allowedTarget" } },
+          "observations": { "$ref": "#/$defs/observations" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": { "enum": ["source", "message", "record", "order"] },
+        "id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "allowedTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_ref", "evidence_type", "visibility", "target"],
+      "properties": {
+        "source_ref": { "type": "string", "minLength": 1 },
+        "evidence_type": { "enum": ["public", "message", "private_record", "postgame"] },
+        "visibility": { "enum": ["public", "private", "omniscient_postgame"] },
+        "target": { "$ref": "#/$defs/target" }
+      }
+    },
+    "observations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["active_units_before", "active_units_after", "supply_centers_before", "supply_centers_after", "message_count", "order_count", "private_record_count"],
+      "properties": {
+        "active_units_before": { "type": "integer", "minimum": 0 },
+        "active_units_after": { "type": "integer", "minimum": 0 },
+        "supply_centers_before": { "type": "integer", "minimum": 0 },
+        "supply_centers_after": { "type": "integer", "minimum": 0 },
+        "message_count": { "type": "integer", "minimum": 0 },
+        "order_count": { "type": "integer", "minimum": 0 },
+        "private_record_count": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

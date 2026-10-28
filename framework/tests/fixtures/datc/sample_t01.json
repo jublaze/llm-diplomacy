@@ -1,0 +1,64 @@
+{
+  "schema_version": "1.0",
+  "case_id": "T01",
+  "title": "Simple bounce scaffold",
+  "initial_state": {
+    "schema_version": "1.0",
+    "map_id": "standard",
+    "year": 1901,
+    "season": "spring",
+    "phase": "movement",
+    "units": [
+      {
+        "schema_version": "1.0",
+        "unit_id": "u_fra_a_par",
+        "owner": "france",
+        "type": "A",
+        "province": "par",
+        "coast": null,
+        "status": "active"
+      },
+      {
+        "schema_version": "1.0",
+        "unit_id": "u_fra_a_mar",
+        "owner": "france",
+        "type": "A",
+        "province": "mar",
+        "coast": null,
+        "status": "active"
+      }
+    ],
+    "supply_ownership": {},
+    "home_centers": {}
+  },
+  "orders": [
+    {
+      "schema_version": "1.0",
+      "order_id": "o_par_bur",
+      "unit_ref": "u_fra_a_par",
+      "power": "france",
+      "type": "MOVE",
+      "payload": {
+        "from": "par",
+        "to": "bur"
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "order_id": "o_mar_bur",
+      "unit_ref": "u_fra_a_mar",
+      "power": "france",
+      "type": "MOVE",
+      "payload": {
+        "from": "mar",
+        "to": "bur"
+      }
+    }
+  ],
+  "expected": {
+    "movement_outcomes": {
+      "u_fra_a_par": "held",
+      "u_fra_a_mar": "held"
+    }
+  }
+}

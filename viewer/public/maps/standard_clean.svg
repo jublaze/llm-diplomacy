@@ -1,0 +1,659 @@
+<svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 610 560" width="610" height="560" role="presentation">
+	<title>Neutral standard Diplomacy board</title>
+	<metadata>Adapted from Diplomacy.svg by Martin Asal, CC BY-SA 3.0; state and unit layers removed.</metadata>
+	<style>
+		tspan { white-space:pre } 
+		.s0 { fill: #f4efe3 } 
+		.s1 { fill: #dcebf0;stroke: #526970;stroke-width: 1.15;stroke-linejoin: round } 
+		.t2 { font-size: 12px;fill: #26383d;font-weight: 700;font-family: system-ui, sans-serif;paint-order: stroke;stroke: #f8f5ed;stroke-width: 2px;stroke-linejoin: round } 
+		.s3 { fill: #d8d6cf;stroke: #526970;stroke-width: 1.15;stroke-linejoin: round } 
+		.s4 { fill: #f4efe3;stroke: #526970;stroke-width: 1.15;stroke-linejoin: round }        
+	</style>
+	<path id="Layer 1" fill-rule="evenodd" class="s0" d="m415 212v342h-350v-342z"/>
+	<g>
+		<path fill-rule="evenodd" class="s1" d="m362 33l-5 6-14 5-19 10-4 10-10 11-1 9-6 2-11 25-15 21-8 2-5 8-6-1-22 13h-38l-27 27v16l-13-4-6 1 2-6 7-3 1-4-14-4v-177h214z"/>
+		<text id="province-label-nwg" data-province="nwg" style="transform: matrix(1,0,0,1,220,70)" >
+			<tspan x="0" y="-11" class="t2">NWG
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path class="s1" d="m171 197v-16c0-3.55 0.7-7.06 2.06-10.33 1.35-3.28 3.34-6.25 5.85-8.76 2.51-2.51 5.48-4.5 8.76-5.85 3.27-1.36 6.78-2.06 10.33-2.06h43v70h7l-3 13h-34v64h-38l-8-8-25-96z"/>
+		<text id="province-label-nth" data-province="nth" style="transform: matrix(1,0,0,1,190,230)" >
+			<tspan x="0" y="-11" class="t2">NTH
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s3" d="m209 363l-1 4-14 15 3 3 6-6 4 7 6 1 8-2 6 5 2-5 14 3 2-4-4-6-7-4v-8l-2-3-7-1-3 3z"/>
+		<text id="province-label-swi" data-province="swi" style="transform: matrix(1,0,0,1,215,378)" >
+			<tspan x="0" y="-11" class="t2">Swi
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s1" d="m322 480l-25-24 3-3h-10l-12-10-6-19-12-7 1-16 9-3 6 1-1 4 3 7 4-9 4 1 3 16 17 18 25 18v23l4 3z"/>
+		<text id="province-label-adr" data-province="adr" style="transform: matrix(1,0,0,1,308,460)" >
+			<tspan x="0" y="-11" class="t2">ADR
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s1" d="m376 537l-5-17 7 1-1-8 9 3-1-7-15-15 1-3 7 3-10-11 3-6 8 7 3-1-1-6 5 1-6-6h12l8-4 8 2 2 3 4 2-4 7-1 5 8-1v3l3 6-3 3v9l6 3 4 14 8-1v7l-19 19-4-2-25-1-4-2z"/>
+		<text id="province-label-aeg" data-province="aeg" style="transform: matrix(1,0,0,1,392,510)" >
+			<tspan x="0" y="-11" class="t2">AEG
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m331 454v23l4 3 4 7 11-10v-6l-4-5v-14l-9-6-7-1z"/>
+		<text id="province-label-alb" data-province="alb" style="transform: matrix(1,0,0,1,333,460)" >
+			<tspan x="0" y="-11" class="t2">Alb
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m555 438l-4-1-31 4-6-3-3 2-9-7-21 5-11 9-6 10 4 4v18l-2 12h7l17-11 11 2 7-2 23-20 15 2 9-2 2-11z"/>
+		<text id="province-label-ank" data-province="ank" style="transform: matrix(1,0,0,1,510,455)" >
+			<tspan x="0" y="-11" class="t2">Ank
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m482 473c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m304 484l6-4 8 5h4v-5l-25-24 3-3h-10l-12-10-4 4 5 4 1 4-1 3 14 23z"/>
+		<text id="province-label-apu" data-province="apu" style="transform: matrix(1,0,0,1,291,470)" >
+			<tspan x="0" y="-11" class="t2">Apu
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m609 493l-25-15-21 1-1-8-6-4-1-7 2-11-2-11 15-11 19 15 5-3 9 2 6-1z"/>
+		<text id="province-label-arm" data-province="arm" style="transform: matrix(1,0,0,1,585,467)" >
+			<tspan x="0" y="-11" class="t2">Arm
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s1" d="m266 255l5 5 7-6-1-4 3-2-1-5 3 10 7 1 5-9 11-1 7-15-1-9h48l-10 9-2 14v5l1 6-4 8-7 2-3 9-6 1-2-9-12 1-7 7-13 2-8-1 1-7-7-1-14 9-5-1-1-5-4-3v-3l-2-8z"/>
+		<text id="province-label-bal" data-province="bal" style="transform: matrix(1,0,0,1,308,260)" >
+			<tspan x="0" y="-11" class="t2">BAL
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s1" d="m540 0l-5 9-5-3-13 13-1 14-3 5v-15l-6-3-2 6-6 7-7 15 3 10-7 2-9-3-2-2 4-5-8-7-7 2 6 17 6 4v8l-6-2-4 2-11 17 12 9-2 6-5 3-18-8-2 9 5 5 7 4-2 3-18-4-8-15v-9l-12-6-2-5 33 1 12-5 2-13-6-5-36-14-12 2-4-4-4 3-6-1 4-6-1-3-10-5-2 7-2-7-3-2-3 7-3-5-5 9v-9h-4v-33z"/>
+		<text id="province-label-bar" data-province="bar" style="transform: matrix(1,0,0,1,440,15)" >
+			<tspan x="0" y="-11" class="t2">BAR
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m191 299l3 4 12 3-1 5 3 4 2 11-5 5-13-8-8-8-15-4 4-10z"/>
+		<text id="province-label-bel" data-province="bel" style="transform: matrix(1,0,0,1,192,321)" >
+			<tspan x="0" y="-11" class="t2">Bel
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m186 309c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m294 275l-8-1 1-7-7-1-14 9v8l-4 4 2 6-3 3 2 14 25-5 8-5 1-4-5-6z"/>
+		<text id="province-label-ber" data-province="ber" style="transform: matrix(1,0,0,1,272,292)" >
+			<tspan x="0" y="-11" class="t2">Ber
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m281 302c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s1" d="m440 458l-10-3-4-5-4-9 3-14 4-1 1-3 2-14 7-5-1-7 8-19 13-3 2 2-2 2 6 4 11-2 2 2-6 2-4 7 9 4v5l9 3 2-7 6-1 3-4 10-3-1-5-12 3-9-9 18-14 23-13 1 3-13 11 3 6h3l-5 13-4-1-1 3 7 7 11 1 26 12 13 2 6 9-3 10-15 11-4-1-31 4-6-3-3 2-9-7-21 5-11 9-6 10-22 3z"/>
+		<text id="province-label-bla" data-province="bla" style="transform: matrix(1,0,0,1,500,418)" >
+			<tspan x="0" y="-11" class="t2">BLA
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m281 356l-5-10-8-3-4-14 2-4 12 1 10-5 9 1 14 12 3-2 7 7 1 8-6 1-13-2-8 3-3 8z"/>
+		<text id="province-label-boh" data-province="boh" style="transform: matrix(1,0,0,1,283,347)" >
+			<tspan x="0" y="-11" class="t2">Boh
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m150 319l-6-1-2-6-6-2v16l-12-3-2-5-20-1-2 5 3 6 6 1 14 15-1 6 1 7 5 6 18 2v-28l2-8z"/>
+		<text id="province-label-bre" data-province="bre" style="transform: matrix(1,0,0,1,130,345)" >
+			<tspan x="0" y="-11" class="t2">Bre
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m106 326c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m394 376l1 6 6 3 5 11-5 6h-14l-20 4-2 6-5 1-18-3-4 2-3-2h-3l-9-2-2-10-10-4-3-11 3-8 11-5 13-16 2-4 13-3 10 4 8 2 9 7 1 3 6 2z"/>
+		<text id="province-label-bud" data-province="bud" style="transform: matrix(1,0,0,1,350,390)" >
+			<tspan x="0" y="-11" class="t2">Bud
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m326 380c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m413 464l-1-10 8-3 6-1-4-9 3-14 4-1 1-3-8-3h-12l-6 2-6 5-8-2-8 2-7-4-5 2-3-4-2 4 3 8 3 5"/>
+		<text id="province-label-bul" data-province="bul" style="transform: matrix(1,0,0,1,395,443)" >
+			<tspan x="0" y="-11" class="t2">Bul
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m371 438l-5 1 5 17-6 5 4 3h7l12-4 4 12 8-4 8 2 5-6-1-10"/>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m377 448c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m192 323l13 8-1 7 7 8 2 6-4 11-1 4-14 15-16-1v9l-5 6-5-1-5-8 2-4-7-3-2-6 9-9 20-21 3-12z"/>
+		<text id="province-label-bur" data-province="bur" style="transform: matrix(1,0,0,1,185,371)" >
+			<tspan x="0" y="-11" class="t2">Bur
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m138 214l-8-6-1-11 10-8 1-7 8-5 14 4-1 4-7 3-2 6-6 6-2 13z"/>
+		<text id="province-label-cly" data-province="cly" style="transform: matrix(1,0,0,1,133,201)" >
+			<tspan x="0" y="-11" class="t2">Cly
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m408 470l2 3 4 2-4 7-1 5 8-1v3l6-2 9 6 20 2 14-4 2-12v-18l-4-4-22 3-2-2-10-3-4-5-6 1-8 3 1 10z"/>
+		<path fill-rule="evenodd" class="s1" d="m414 475l7-8 14-4 5-5 2 2-3 3 9 1-23 11z"/>
+		<text id="province-label-con" data-province="con" style="transform: matrix(1,0,0,1,435,483)" >
+			<tspan x="0" y="-11" class="t2">Con
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m429 464c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m279 243l-4-1-6 1-3-3 1-6-1-13-3 2-15 1-3 13-2 10 1 7 10 1h12l5 5 7-6-1-4 3-2z"/>
+		<path fill-rule="evenodd" class="s1" d="m269 243l-1 3-5 1 3 8h-12l3-8 9-7z"/>
+		<text id="province-label-den" data-province="den" style="transform: matrix(1,0,0,1,250,235)" >
+			<tspan x="0" y="-11" class="t2">Den
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m272 256c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s1" d="m435 530l6-4 6 2 6 6 11-3 2-10 9-1 10 8 6 2 14-4 6-12 9 3 7-9 3 1-5 9 1 12 6 5-4 24h-128v-5l14-2 2-3z"/>
+		<text id="province-label-eas" data-province="eas" style="transform: matrix(1,0,0,1,455,550)" >
+			<tspan x="0" y="-11" class="t2">EAS
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m152 194l6-1 13 4-1 5-5 8-7 4-7 1 6 1 4 2 2 8-8 2-10-11-1-4 2-13z"/>
+		<text id="province-label-edi" data-province="edi" style="transform: matrix(1,0,0,1,152,202)" >
+			<tspan x="0" y="-11" class="t2">Edi
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m154 223c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s1" d="m173 301l-4 10-16 4 2 5-5-1-6-1-2-6-6-2v16l-12-3-2-5-20-1-14-14 12-12 10 1 10 3 4-4 10 3 13 1 13 3 8-2z"/>
+		<text id="province-label-eng" data-province="eng" style="transform: matrix(1,0,0,1,135,306)" >
+			<tspan x="0" y="-11" class="t2">ENG
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m362 107l6 1 4 12-6 1-7 15-14 15 2 9 3 5-2 13 1 6 8 2 8 5 19-6 18-8 10-16-2-9 4-5-4-17-8-12-1-8-9-18 1-19-6-5 1-7-2-3 2-4-9-6-9 1-1 12-14 1-9-8-4 7 14 10z"/>
+		<text id="province-label-fin" data-province="fin" style="transform: matrix(1,0,0,1,375,160)" >
+			<tspan x="0" y="-11" class="t2">Fin
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m333 330h8l3 2 9-5 3-4 5 1 6 5 7-2 5-3 4 3 2 5 14 6 5 16-1 6 1 11-10 5-10-11-6-2-1-3-9-7-8-2-10-4-13 3-8-4-7 1-1-8 1 8-1-8 4 1 4-2z"/>
+		<text id="province-label-gal" data-province="gal" style="transform: matrix(1,0,0,1,355,343)" >
+			<tspan x="0" y="-11" class="t2">Gal
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m128 363l-7 19 1 2-10 15 1 8 10 5 11 5 1-3 7 3 7-14 8-6 11-2-5-8 2-4-7-3-2-6-7-2-3-7z"/>
+		<text id="province-label-gas" data-province="gas" style="transform: matrix(1,0,0,1,130,400)" >
+			<tspan x="0" y="-11" class="t2">Gas
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m339 487l7 11h4l-3 2 5 8 15-1 4 4-16-1-5 4 7 7 2 12 1-5 7 8 1-5 8 6-5-17 7 1-1-8 9 3-1-7-15-15 1-3 7 3-10-11 3-6 8 7 3-1-1-6 5 1-6-6h12l-4-12-12 4h-7l-8 3-5 4h-6v6z"/>
+		<text id="province-label-gre" data-province="gre" style="transform: matrix(1,0,0,1,352,490)" >
+			<tspan x="0" y="-11" class="t2">Gre
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m378 511c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s1" d="m115 469l-5-8 14-17 7-5 15-1 11-6 1-7v-7l11-6 7 5 12 5 10-1 13-5 11-6 11 5 5 16h-14l-3 3-10 2 2 15 5 3v4l-4 3-8 1-1 4h-51l-6-3-6 6z"/>
+		<text id="province-label-lyo" data-province="lyo" style="transform: matrix(1,0,0,1,170,457)" >
+			<tspan x="0" y="-11" class="t2">LYO
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s1" d="m311 220l3-11 8-3 6-3 3-10-5-10-6-1 1-21 9-15 13-8 8-10-4-7 2-9 6-8 7 3 6 1 4 12-6 1-7 15-14 15 2 9 3 5-2 13 1 6 8 2 8 5 19-6 18-8 1 6 8 1 3 3h-6l-8 5-1 5-12-1-16 2-2 4-4 2 3 6 4 3 1 8 4 6-4 2-7-1-7-8z"/>
+		<text id="province-label-bot" data-province="bot" style="transform: matrix(1,0,0,1,328,175)" >
+			<tspan x="0" y="-11" class="t2">BOT
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s1" d="m245 237l-2 10 1 7-1 3 2 6-1 7v3l-9 4-1-3-4-1-4 2-15-1v-37z"/>
+		<text id="province-label-hel" data-province="hel" style="transform: matrix(1,0,0,1,220,265)" >
+			<tspan x="0" y="-11" class="t2">HEL
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m226 275l1 5-2 12-5 6-5-1-2 5-3 11-2 2-3-4 1-5-12-3-3-4 7-10 7-13v3h2l4-5z"/>
+		<text id="province-label-hol" data-province="hol" style="transform: matrix(1,0,0,1,210,290)" >
+			<tspan x="0" y="-11" class="t2">Hol
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m205 288c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s1" d="m289 511l1 3 5 1 13-15 3-9-7-7 6-4 8 5h4v-5h13l4 7 7 11h4l-3 2 5 8 15-1 4 4-16-1-5 4 7 7 2 12 1-5 7 8 1-5 8 6 7 7-3 3 3 3 17 4v5h-168l2-8-2-7-7-9 6-4 5-7 11-11 11 6 15 12 8 1 1-11 3-8v-2z"/>
+		<text id="province-label-ion" data-province="ion" style="transform: matrix(1,0,0,1,315,520)" >
+			<tspan x="0" y="-11" class="t2">ION
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s1" d="m100 291l12-4 10-6 8 1-3-6-8-4h-3l-1-7 13-3-2-6-5 1 11-7h3l4-10-3-11-6-2h-10l-10 5-1 14-11 13-11-2-17 4-12 12 30 30z"/>
+		<text id="province-label-iri" data-province="iri" style="transform: matrix(1,0,0,1,95,270)" >
+			<tspan x="0" y="-11" class="t2">IRI
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m244 254l-1 3 2 6-1 7v3l-9 4-1-3-4-1-4 2 1 5-2 12-5 6-5-1-2 5 19 6 9 8 2 6 20-12-2-14 3-3-2-6 4-4v-8l-5-1-1-5-4-3v-3l-2-8z"/>
+		<path fill-rule="evenodd" class="s1" d="m244 270v3l12-7v-3z"/>
+		<text id="province-label-kie" data-province="kie" style="transform: matrix(1,0,0,1,237,285)" >
+			<tspan x="0" y="-11" class="t2">Kie
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m254 282c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m128 262l-2-6-5 1 11-7h3l4-10-3-11-6-2v-4l8-6v-3l6-1 1 4 10 11v11l-4 9-1 16-7-2z"/>
+		<text id="province-label-lvp" data-province="lvp" style="transform: matrix(1,0,0,1,138,230)" >
+			<tspan x="0" y="-11" class="t2">Lvp
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m144 261c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m369 202l-4 2 3 6 4 3 1 8 4 6-4 2-7-1-7-8-10 9-2 14 7 8 2 10 6-1 5 5-2 16 7 2 7 7 10-5 3-7 12-3 1-36 4-11-4-11-11-12-12 1-10-1z"/>
+		<text id="province-label-lvn" data-province="lvn" style="transform: matrix(1,0,0,1,380,260)" >
+			<tspan x="0" y="-11" class="t2">Lvn
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m166 269l2 1 3-2 6 2 1 4-2 9-11 10 7 1-4 2-8 2-13-3-2-14 5-4 3-6z"/>
+		<text id="province-label-lon" data-province="lon" style="transform: matrix(1,0,0,1,160,280)" >
+			<tspan x="0" y="-11" class="t2">Lon
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m162 294c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m142 417l7-14 8-6 11-2 5 1 5-6v-9l16 1 3 3 6-6 4 7-3 4 3 6-6 3 3 3-1 8 8 6-13 5-10 1-12-5-7-5-11 6v7l-4 2z"/>
+		<text id="province-label-mar" data-province="mar" style="transform: matrix(1,0,0,1,173,412)" >
+			<tspan x="0" y="-11" class="t2">Mar
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m186 421c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s1" d="m102 317l-2 5 3 6 6 1 14 15-1 6 1 7 5 6-7 19 1 2-10 15-11-3-5 1-24-13-13-3-5-6-6-1-2 4-7-3-6 6 2 3-3 12-2 10-13 21h-3l-4 6 3 7 2 1-3 9 1 4-5 8 11 7 8-1 6 7 1 9 3 6v5l-4 1-16 22-17 2v-247h58z"/>
+		<text id="province-label-mao" data-province="mao" style="transform: matrix(1,0,0,1,50,355)" >
+			<tspan x="0" y="-11" class="t2">MAO
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m609 117l-11 15-25 11-9 16-30 5-19 5-26 15-13-1-18 11-2 13 1 3-6 3-4-4-8 2-11 14-7 4-12-1-4 11-1 36-12 3-3 7-10 5 7 19 4-3 66-14 12 3 9-6 17 6 11-15 11 6 10 1 7-4 16 1 5 20 10 1 5 16 28 9h12z"/>
+		<text id="province-label-mos" data-province="mos" style="transform: matrix(1,0,0,1,460,265)" >
+			<tspan x="0" y="-11" class="t2">Mos
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m481 238c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m234 366l9 4 3-1 4 2 17-3 4 2-2-8h6l6-6-5-10-8-3-4-14 2-4 12 1 10-5-4-7 4-9-25 5-20 12h-6l-18 22-8 2 2 6-4 11 13 2 3-3 7 1z"/>
+		<text id="province-label-mun" data-province="mun" style="transform: matrix(1,0,0,1,235,360)" >
+			<tspan x="0" y="-11" class="t2">Mun
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m258 363c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m271 464l5 10 14 13 4 15-5 9 1 3 5 1 13-15 3-9-7-7-11-3-14-23z"/>
+		<text id="province-label-nap" data-province="nap" style="transform: matrix(1,0,0,1,293,493)" >
+			<tspan x="0" y="-11" class="t2">Nap
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m278 473c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s1" d="m70 261l-6-11 3-8 4 3 10-11-7-6 6-3-2-7 4-1 7 3h5l1-2-1-2h3l4-4h9l9 5 1 10h10v-4l8-6v-3l-8-6-1-11 10-8 1-7 8-5v-177h-148v273h58z"/>
+		<text id="province-label-nao" data-province="nao" style="transform: matrix(1,0,0,1,65,120)" >
+			<tspan x="0" y="-11" class="t2">NAO
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m203 520l-24-5-10 3-19-7-33-2-11 2-7 4-10-3-5 6-5 2-11-4v-5l-4 3-18-5-4-7-1-8-4 1-4 1-16 22-17 2v39h195l2-32z"/>
+		<text id="province-label-naf" data-province="naf" style="transform: matrix(1,0,0,1,130,536)" >
+			<tspan x="0" y="-11" class="t2">Naf
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m397 48l-6-1 4-6-1-3-10-5-2 7-2-7-3-2-3 7-3-5-5 9v-9h-4l-5 6-14 5-19 10-4 10-10 11-1 9-6 2-11 25-15 21-8 2-5 8-6-1-22 13 1 6-4 7-2 13 2 6-4 6 2 9 10 8 5 1 20-9 4-8 5 10 4 1 8-27-2-7 5-6 2-31 9-1-1-6 9-11-1-11 3-3 13-30 8 3-2-10 11 1 1-4 4-7 9 8 14-1 1-12 9-1 9 6-2 4 2 3z"/>
+		<text id="province-label-nwy" data-province="nwy" style="transform: matrix(1,0,0,1,250,175)" >
+			<tspan x="0" y="-11" class="t2">Nwy
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m270 191c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m146 365l3 7 7 2 9-9 20-21 3-12-16-4-7 3h-6l-11-2-2 8z"/>
+		<text id="province-label-par" data-province="par" style="transform: matrix(1,0,0,1,155,358)" >
+			<tspan x="0" y="-11" class="t2">Par
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m173 338c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m169 311l-16 4 2 5-5-1-2 10 11 2h6l7-3 16 4 4-9-8-8z"/>
+		<text id="province-label-pic" data-province="pic" style="transform: matrix(1,0,0,1,168,326)" >
+			<tspan x="0" y="-11" class="t2">Pic
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m207 386l-3 4 3 6-6 3 3 3-1 8 8 6 11-6 11 5 3-4-3-7 13-12-3-4-14-3-2 5-6-5-8 2z"/>
+		<text id="province-label-pie" data-province="pie" style="transform: matrix(1,0,0,1,215,408)" >
+			<tspan x="0" y="-11" class="t2">Pie
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m32 396l-2 10-13 21h-3l-4 6 3 7 2 1-3 9 1 4-5 8 11 7 8-1 9-11-2-10 6-6-3-10 5 1 10-20 9-1 1-4-7-7-13-1 1-4z"/>
+		<text id="province-label-por" data-province="por" style="transform: matrix(1,0,0,1,22,440)" >
+			<tspan x="0" y="-11" class="t2">Por
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m15 438c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m347 243v5l1 6-4 8-7 2-3 9-6 1-2-9-12 1-7 7-13 2-2 15 5 6-1 4 24 3 4-4 2-7 15-5 4 2 14-3 6-5 2-16-5-5-6 1-2-10z"/>
+		<text id="province-label-pru" data-province="pru" style="transform: matrix(1,0,0,1,335,283)" >
+			<tspan x="0" y="-11" class="t2">Pru
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m247 442l1 5 8 11 15 6 8-6 1-3-1-4-5-4-11-13-13 4z"/>
+		<text id="province-label-rom" data-province="rom" style="transform: matrix(1,0,0,1,257,452)" >
+			<tspan x="0" y="-11" class="t2">Rom
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m252 447c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m213 302l-3 11-2 2 2 11-5 5-1 7 7 8 8-2 18-22h6l-2-6-9-8z"/>
+		<text id="province-label-ruh" data-province="ruh" style="transform: matrix(1,0,0,1,215,330)" >
+			<tspan x="0" y="-11" class="t2">Ruh
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m403 360l1 11-10 5 1 6 6 3 5 11-5 6h-14l-20 4-2 6 2 9 3 4 5-2 7 4 8-2 8 2 6-5 6-2h12l8 3 2-14 7-5-1-7-11 2-5-17 1-6-9-4-3-11z"/>
+		<text id="province-label-rum" data-province="rum" style="transform: matrix(1,0,0,1,410,415)" >
+			<tspan x="0" y="-11" class="t2">Rum
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m402 417c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m365 412l-5 1-18-3-4 2-3-2h-3l-2 6 1 8-4 5 3 8 7 9 9 6v14l4 5h6l5-4 8-3-4-3 6-5-5-17 5-1-3-5-3-8 2-4z"/>
+		<text id="province-label-ser" data-province="ser" style="transform: matrix(1,0,0,1,350,450)" >
+			<tspan x="0" y="-11" class="t2">Ser
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m343 423c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m438 397l8-19 13-3 2 2-2 2 6 4 11-2 2 2-6 2-4 7 9 4v5l9 3 2-7 6-1 3-4 10-3-1-5-12 3-9-9 18-14 23-13 1 3-13 11 3 6h3l-5 13-4-1-1 3 7 7 11 1 26 12 13 2 6 9-3 10 19 15 5-3 9 2 6-1v-110h-12l-28-9-5-16-10-1-5-20-16-1-7 4-10-1-11-6-11 15-17-6-9 6 2 8-4 4-6 38-15 5-11 10-2 12-9 4-1 6 5 17z"/>
+		<text id="province-label-sev" data-province="sev" style="transform: matrix(1,0,0,1,540,350)" >
+			<tspan x="0" y="-11" class="t2">Sev
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m483 400c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m288 321l9 1 14 12 3-2 7 7 4 1 4-2 4-8-7-3-3-5-3-19-24-3-8 5-4 9z"/>
+		<text id="province-label-sil" data-province="sil" style="transform: matrix(1,0,0,1,304,325)" >
+			<tspan x="0" y="-11" class="t2">Sil
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s1" d="m241 209l5 1 20-9 4-8 5 10 2 15-1 6 6 12-3 4v3l-4-1-6 1-3-3 1-6-1-13-3 2-15 1h-7z"/>
+		<text id="province-label-ska" data-province="ska" style="transform: matrix(1,0,0,1,255,220)" >
+			<tspan x="0" y="-11" class="t2">SKA
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m417 489l3 6-3 3v9l6 3 4 14 8-1v7l6-4 6 2 6 6 11-3 2-10 9-1 10 8 6 2 14-4 6-12 9 3 7-9 3 1 6-15 9-8 10-2 8-5-1-8-6-4-1-7-9 2-15-2-23 20-7 2-11-2-17 11h-7l-14 4-20-2-9-6z"/>
+		<text id="province-label-smy" data-province="smy" style="transform: matrix(1,0,0,1,460,510)" >
+			<tspan x="0" y="-11" class="t2">Smy
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m424 506c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m134 417l-11-5-10-5-1-8-11-3-5 1-24-13-13-3-5-6-6-1-2 4-7-3-6 6 2 3-3 12 11-1-1 4 13 1 7 7-1 4-9 1-10 20-5-1 3 10"/>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m40 441l-6 6 2 10-9 11 6 7 1 9 3 6 10-2 5 1 8-3 18 5 5 3 3-9 4-2 8 1 9-10 6-1 2-4-5-8 14-17 7-5 15-1 11-6 1-7-4 2-12-10-7-3-1 3-11-5"/>
+		<text id="province-label-spa" data-province="spa" style="transform: matrix(1,0,0,1,85,450)" >
+			<tspan x="0" y="-11" class="t2">Spa
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m80 436c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m534 164l30-5 9-16 25-11 11-15v-117h-69l-5 9-5-3-13 13-1 14-3 5v-15l-6-3-2 6-6 7-7 15 3 10-7 2-9-3-2-2 4-5-8-7-7 2 6 17 6 4v8l-6-2-4 2-11 17 12 9-2 6-5 3-18-8-2 9 5 5 7 4-2 3-18-4-8-15v-9l-12-6-2-5 33 1 12-5 2-13-6-5-36-14-12 2-4-4-4 3-9 13-1 7 6 5-1 19 9 18 1 8 8 12 4 17"/>
+		<text id="province-label-stp" data-province="stp" style="transform: matrix(1,0,0,1,460,149)" >
+			<tspan x="0" y="-11" class="t2">Stp
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m414 147l-4 5 2 9-10 16 1 6 8 1 3 3h-6l-8 5-1 5-12-1-16 2-2 4 3 3 10 1 12-1 11 12 4 11 12 1 7-4 11-14 8-2 4 4 6-3-1-3 2-13 18-11 13 1 26-15 19-5 30-5"/>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m418 191c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m275 203l2 15-1 6 6 12-3 4v3l3 10 7 1 5-9 11-1 7-15-1-9 3-11 8-3 6-3 3-10-5-10-6-1 1-21 9-15 13-8 8-10-4-7 2-9 6-8 7 3-6-36-14-10-1 4-11-1 2 10-8-3-13 30-3 3 1 11-9 11 1 6-9 1-2 31-5 6 2 7-8 27z"/>
+		<text id="province-label-swe" data-province="swe" style="transform: matrix(1,0,0,1,300,170)" >
+			<tspan x="0" y="-11" class="t2">Swe
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m323 200c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m530 509l6-15 9-8 10-2 8-5 21-1 25 15v66h-81l4-24-6-5-1-12z"/>
+		<text id="province-label-syr" data-province="syr" style="transform: matrix(1,0,0,1,570,535)" >
+			<tspan x="0" y="-11" class="t2">Syr
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m276 399l-1 4 3 7 4-9 4 1 3 16 17 18 25 18-1-9 7 1-7-9-3-8 4-5-1-8 2-6-9-2-2-10-10-4-3-11-9 2-5-5-5 5-13 1 3 3z"/>
+		<text id="province-label-tri" data-province="tri" style="transform: matrix(1,0,0,1,305,425)" >
+			<tspan x="0" y="-11" class="t2">Tri
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m284 400c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m232 559l2-8-2-7-7-9 6-4 5-7-3-1-9 4-1-9-5-2-6 1-4 4-5-1-6 7-2 32z"/>
+		<text id="province-label-tun" data-province="tun" style="transform: matrix(1,0,0,1,210,555)" >
+			<tspan x="0" y="-11" class="t2">Tun
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m220 533c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m233 415l5 16 9 11 3-4 13-4-10-16-7-2-6-1-4-4z"/>
+		<text id="province-label-tus" data-province="tus" style="transform: matrix(1,0,0,1,240,425)" >
+			<tspan x="0" y="-11" class="t2">Tus
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m234 366l9 4 3-1 4 2 17-3 4 2-2-8h6l6-6 11 1 3 5-1 18-5 5-13 1-8-1-9 3-4 6-5 3-4-5-3-4 2-4-4-6-7-4z"/>
+		<text id="province-label-tyr" data-province="tyr" style="transform: matrix(1,0,0,1,255,380)" >
+			<tspan x="0" y="-11" class="t2">Tyr
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s1" d="m238 431l9 11 1 5 8 11 15 6 5 10 14 13 4 15-5 9h-4v-3l-9 2h-13l-6-3-5 1-5 5-11 11-3-1-9 4-1-9-5-2v-26h2l4-22-2-10h-4v-4l5-4 2-6v-8l-1-5z"/>
+		<text id="province-label-tys" data-province="tys" style="transform: matrix(1,0,0,1,245,495)" >
+			<tspan x="0" y="-11" class="t2">TYS
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m383 327l2 5 14 6 5 16-1 6 8 1 3 11 9 4 9-4 2-12 11-10 15-5 6-38 4-4-2-8-12-3-66 14-4 3z"/>
+		<text id="province-label-ukr" data-province="ukr" style="transform: matrix(1,0,0,1,420,340)" >
+			<tspan x="0" y="-11" class="t2">Ukr
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m278 443l-6-19-12-7 1-16 9-3 6 1 3-10-3-3-8-1-9 3-4 6-5 3-4-5-13 12 3 7 4 4 6 1 7 2 10 16 11 13z"/>
+		<text id="province-label-ven" data-province="ven" style="transform: matrix(1,0,0,1,245,407)" >
+			<tspan x="0" y="-11" class="t2">Ven
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m261 401c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m292 357l3-8 8-3 13 2 6-1 7-1 8 4-2 4-13 16-11 5-3 8-9 2-5-5 1-18z"/>
+		<text id="province-label-vie" data-province="vie" style="transform: matrix(1,0,0,1,307,370)" >
+			<tspan x="0" y="-11" class="t2">Vie
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m301 367c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m100 291l12-4 10-6 8 1-3-6-8-4h-3l-1-7 13-3h15l7 2 3 7-3 6-5 4 2 14-13-1-10-3-4 4-10-3z"/>
+		<text id="province-label-wal" data-province="wal" style="transform: matrix(1,0,0,1,130,275)" >
+			<tspan x="0" y="-11" class="t2">Wal
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m333 330l-7-3-3-5-3-19 4-4 2-7 15-5 4 2 14-3 6-5 7 2 7 7 7 19-3 18-4-3-5 3-7 2-6-5-5-1-3 4-9 5-3-2z"/>
+		<text id="province-label-war" data-province="war" style="transform: matrix(1,0,0,1,355,304)" >
+			<tspan x="0" y="-11" class="t2">War
+</tspan>
+		</text>
+		<g id="sc">
+			<path fill-rule="evenodd" class="s4" d="m346 306c-2.21 0-4-1.79-4-4 0-2.21 1.79-4 4-4 2.21 0 4 1.79 4 4 0 2.21-1.79 4-4 4z"/>
+		</g>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s1" d="m37 490l10-2 5 1 8-3 18 5 5 3 3-9 4-2 8 1 9-10 6-1 2-4h27l8 2 4-5h51l1 10-2 9 4 7h4l5-3 1 1v26l-6 1-4 4-5-1-24-5-10 3-19-7-33-2-11 2-7 4-10-3-5 6-5 2-11-4v-5l-4 3-18-5-4-7-1-8-4 1z"/>
+		<text id="province-label-wes" data-province="wes" style="transform: matrix(1,0,0,1,160,491)" >
+			<tspan x="0" y="-11" class="t2">WES
+</tspan>
+		</text>
+	</g>
+	<g>
+		<path fill-rule="evenodd" class="s4" d="m163 226v13l5 7 2 6-1 13-3 4-13 2-3-7 1-16 4-9v-11z"/>
+		<text id="province-label-yor" data-province="yor" style="transform: matrix(1,0,0,1,155,254)" >
+			<tspan x="0" y="-11" class="t2">Yor
+</tspan>
+		</text>
+	</g>
+</svg>

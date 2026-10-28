@@ -1,0 +1,27 @@
+schema_version: "1.0"
+experiment_id: first_population_test
+
+agents:
+  - blueprints/cassandra.yaml
+  - blueprints/dorian.yaml
+  - blueprints/marcellus.yaml
+  - blueprints/seraphine.yaml
+  - blueprints/helena.yaml
+  - blueprints/victor.yaml
+  - blueprints/selene.yaml
+
+agent_state_mode: fresh
+
+runtime:
+  kind: baseline_llm
+  provider: fake
+
+games:
+  count: 7
+  max_year: 1903
+  country_assignment: round_robin
+  seed: 12345
+
+outputs:
+  observatory: true
+  summary: true

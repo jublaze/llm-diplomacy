@@ -1,0 +1,34 @@
+.comparison-page { max-width: 1380px; }
+.comparison-hero { margin-bottom: 1rem; }
+.comparison-selection, .comparison-issues, .comparison-table-wrap { margin: 1rem 0; padding: 1rem; border: 1px solid #d7d2c8; border-radius: 12px; background: #fff; box-shadow: 0 4px 22px #1c29260c; }
+.comparison-selection h2, .comparison-issues h2 { margin: 0 0 .7rem; font-family: Georgia, serif; }
+.comparison-selection fieldset { display: flex; flex-wrap: wrap; gap: .6rem; border: 0; padding: 0; }
+.comparison-selection legend { width: 100%; margin-bottom: .4rem; font-weight: 750; }
+.comparison-selection label { display: flex; align-items: flex-start; gap: .45rem; min-width: 12rem; padding: .55rem .7rem; border: 1px solid #d7d2c8; border-radius: 8px; }
+.comparison-selection label small { display: block; margin-top: .15rem; color: #657177; }
+.comparison-status { padding: .8rem 1rem; }
+.comparison-issues { border-color: #b88959; background: #fff8ed; }
+.comparison-issues li + li { margin-top: .35rem; }
+.comparison-table-wrap { overflow-x: auto; }
+.comparison-table-wrap table { width: 100%; min-width: 760px; border-collapse: collapse; }
+.comparison-table-wrap caption { padding: 0 0 .8rem; text-align: left; font-family: Georgia, serif; font-size: 1.45rem; font-weight: 750; }
+.comparison-table-wrap th, .comparison-table-wrap td { padding: .7rem; border: 1px solid #ddd8ce; text-align: left; vertical-align: top; }
+.comparison-table-wrap thead th { background: #e1ece9; }
+.comparison-table-wrap tbody th { width: 17rem; background: #f7f4ed; }
+.comparison-table-wrap td > span { overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.missing-cell { color: #6b5544; background: #fff8ed; }
+.source-links { display: flex; flex-wrap: wrap; gap: .25rem .55rem; margin-top: .35rem; font-size: .76rem; }
+.source-links a { color: #175862; }
+
+@media (max-width: 560px) {
+  .comparison-selection fieldset { display: grid; }
+  .comparison-selection label { min-width: 0; }
+  .comparison-table-wrap { margin-inline: 0; padding: .6rem; }
+  .comparison-table-wrap table { min-width: 0; table-layout: fixed; }
+  .comparison-table-wrap caption { overflow-wrap: anywhere; }
+  .comparison-table-wrap th, .comparison-table-wrap td { padding: .45rem; font-size: .78rem; }
+  .comparison-table-wrap th:first-child { width: 34%; }
+  .comparison-table-wrap thead th:not(:first-child) { width: 33%; }
+  .comparison-table-wrap tbody th { width: auto; }
+  .source-links { font-size: .69rem; }
+}

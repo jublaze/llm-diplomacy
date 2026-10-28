@@ -1,0 +1,30 @@
+schema_version: "1.0"
+experiment_id: per_player_provider_comparison
+agent_state_mode: fresh
+
+# Dedicated root prevents either Cassandra instance from reusing cassandra's normal folio.
+agents:
+  - agent_id: cassandra_a
+    blueprint: blueprints/cassandra.yaml
+    provider_config: {kind: fake, model: fake-cassandra-a}
+  - agent_id: cassandra_b
+    blueprint: blueprints/cassandra.yaml
+    provider_config: {kind: fake, model: fake-cassandra-b}
+  - blueprints/dorian.yaml
+  - blueprints/marcellus.yaml
+  - blueprints/seraphine.yaml
+  - blueprints/helena.yaml
+  - blueprints/victor.yaml
+
+runtime:
+  kind: baseline_llm
+  provider: fake
+  llm_agent_ids: [cassandra_a, cassandra_b]
+
+games:
+  count: 1
+  max_year: 1901
+  country_assignment: round_robin
+  seed: 12345
+
+outputs: {observatory: true, summary: true}

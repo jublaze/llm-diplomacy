@@ -1,0 +1,19 @@
+id: openai_gpt_6_1_terra
+provider_name: openai
+api_style: responses
+model: gpt-6.1-terra
+base_url: https://api.openai.com/v1
+api_key_env_var: LLM_DIPLOMACY_OPENAI_API_KEY
+supports_temperature: false
+supports_reasoning_effort: true
+reasoning_effort_values: [none, low, medium, high, xhigh, max]
+reasoning_effort_param_style: nested_reasoning
+default_reasoning_effort: medium
+supports_max_output_tokens: true
+input_cost_per_1k_tokens: 0.001
+output_cost_per_1k_tokens: 0.005
+notes: >-
+  Proposed comparator; not launch authorization. Standard short-context uncached
+  estimates checked 2026-10-28 at https://developers.openai.com/api/docs/models/gpt-6.1-terra.
+  Cached input, cache writes, long-context, Fast, regional and other tier prices
+  differ. Actual account access is unverified; never substitute another model.

@@ -1,0 +1,17 @@
+# External DATC corpus
+
+`datc.json` is the 171-case DATC v3 test index from `TedDriggs/diplomacy`, pinned to commit `1625473b28760f184f02eb50da28d485e2a55f30` (`diplotest/datc.json`). SHA-256: `6c2300a4550a9ae21e824f9b5f0e7e039cf6802bbe07efc0ac3148a9eb43e711`.
+
+Source: https://github.com/TedDriggs/diplomacy/blob/1625473b28760f184f02eb50da28d485e2a55f30/diplotest/datc.json
+
+The upstream repository is MIT licensed; its license is included as `LICENSE`. The index identifies each case and links it to the official DATC v3.0 document at https://webdiplomacy.net/doc/DATC_v3_0.html. DATC v3.0 permits the tests in Chapter 6 to be copied separately without restriction (document lines 34–35). This project preserves all 171 source entries and their order expectations. Cases the engine cannot faithfully represent are reported as unsupported with a reason; they are not silently omitted or counted as passing.
+
+## Local faithful supplements and selected policy
+
+The unchanged pinned JSON is an index, not a complete transcription. `supplements.json` restores official 6.H.1-H.3 movement setups and illegal retreat orders; the second Moscow build (6.I.7), repeated Paris removal and two-removal quota (6.J.2), and one-removal quota (6.J.1). It corrects upstream expectations to the official text: Liverpool's self-move support fails in6.A.5; wrong-origin coast and army coastal notation are tolerated in6.B.10/12; the equal-strength attacks in6.B.15 both bounce. `additional_cases.json` supplies omitted6.D.16. Upstream's6.J.12 reference corresponds to official6.J.11; the coverage index corrects that link without altering the upstream file.
+
+There are 172 indexed entries covering all 164 official Chapter 6 IDs: 155 match selected expectations, nine differ under documented project policies, one has an adapter limitation, and seven are historical alternative editions. This is coverage with explicit differences, not unqualified standard-rules conformance. Upstream parser ignore/errata markers are not skipped. The engine consumes typed orders; the adapter translates shorthand and infers adjacent convoy intent from potential same-country fleet routes. Illegal unnecessary convoy intent is not inferred. For ordinary 6.G.11, the source omits explicit adjacent convoy intent, while this converter infers it from a matching own-country convoy order. That mismatch is an adapter limitation, not an existing project rule policy; the explicit-intent variant is tracked separately.
+
+`coverage.json` enumerates every entry. Each policy divergence names its governing project rule, exact mismatch and SHA256 of the complete resolved result. The adapter limitation likewise pins its exact mismatch and result hash. Unexpected failures, new exclusions, changed declared outcomes or missing cases fail validation. Four convoy cases (6.F.16-18 and 6.F.22) use the project's conservative convoy-independence policy. Five civil-disorder cases use owned-home-center graph distance and reverse lexical tie breaks. Historical 1971/1982 alternatives remain individually identified, never counted as passes.
+
+Run `python scripts/run_datc.py` from the repository root. All source data are local; no provider calls or downloads occur. Source case facts and changes were checked against https://webdiplomacy.net/doc/DATC_v3_0.html on2026-10-15; Chapter6 permits separate copying. The vendored upstream file/license remain unchanged.

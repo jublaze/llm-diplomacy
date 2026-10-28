@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llm-diplomacy"
+version = "0.1.0"
+description = "Core infrastructure skeleton for persistent-agent tournaments."
+requires-python = ">=3.10"
+dependencies = ["pyyaml>=6.0"]
+
+[project.scripts]
+export-report-bundle = "llm_diplomacy.reporting.bundle_exporter:main"
+project-report-bundle = "llm_diplomacy.reporting.report_projector:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"llm_diplomacy.reporting" = ["contracts/*.json"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

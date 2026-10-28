@@ -1,0 +1,21 @@
+schema_version: "1.0"
+experiment_id: native_codex_cli_bounded_example
+games: 1
+agents:
+  - agent_id: native_codex_player
+    runtime_kind: llm
+rule_engine:
+  name: diplomacy
+negotiation:
+  max_ticks: 1
+seed: 7
+llm_provider:
+  kind: codex_cli
+  model: gpt-6.1-sol
+  reasoning_effort: low
+  timeout_seconds: 90
+budget:
+  max_provider_calls: 1
+  max_input_tokens: 100000
+  max_output_tokens: 10000
+  stop_policy: stop_experiment

@@ -1,0 +1,65 @@
+name: Reviewed full Luna postgame Pages release
+on:
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: pages-full-postgame
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: viewer/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch exactly the separately reviewed dataset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release download luna1912-full-postgame-v1 --pattern luna1912-full-postgame-v1.zip --dir "$RUNNER_TEMP/luna-asset"
+      - name: Check pinned checksum and extract exact members
+        run: python publication/release_asset.py extract --asset "$RUNNER_TEMP/luna-asset/luna1912-full-postgame-v1.zip" --data-root "$RUNNER_TEMP/luna-data" --lock publication/luna-release-lock.json
+      - run: npm ci --ignore-scripts
+        working-directory: viewer
+      - name: Validate, stage and build actual Luna data
+        working-directory: viewer
+        env:
+          LUNA_RELEASE_DATA: ${{ runner.temp }}/luna-data
+          PUBLIC_BASE_PATH: /${{ github.event.repository.name }}/
+          PUBLIC_BUILD_INPUT_ROOT: full-postgame-input
+          PUBLIC_BUILD_OUTPUT_ROOT: dist-full-postgame
+        run: |
+          npm test
+          npm run test:full-postgame
+          python -m unittest discover -s ../publication -p test_full_postgame.py
+          npm run typecheck
+          node --experimental-strip-types scripts/full_postgame_build.ts stage "$RUNNER_TEMP/luna-data" full-postgame-input
+          node --experimental-strip-types scripts/full_postgame_build.ts verify-stage full-postgame-input
+          npx --no-install vite build --mode public
+          touch dist-full-postgame/.nojekyll
+          node --experimental-strip-types scripts/full_postgame_build.ts verify-build dist-full-postgame
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: viewer/dist-full-postgame
+          retention-days: 1
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy reviewed artifact
+        id: deployment
+        uses: actions/deploy-pages@v4

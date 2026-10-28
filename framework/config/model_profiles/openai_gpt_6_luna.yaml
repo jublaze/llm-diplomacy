@@ -1,0 +1,23 @@
+id: openai_gpt_6_luna
+provider_name: openai
+api_style: responses
+model: gpt-6-luna
+base_url: https://api.openai.com/v1
+api_key_env_var: LLM_DIPLOMACY_OPENAI_API_KEY
+supports_temperature: false
+supports_reasoning_effort: true
+reasoning_effort_values:
+- none
+- low
+- medium
+- high
+- xhigh
+- max
+reasoning_effort_param_style: nested_reasoning
+default_reasoning_effort: high
+supports_max_output_tokens: true
+input_cost_per_1k_tokens: 0.0001
+output_cost_per_1k_tokens: 0.0005
+notes: Standard uncached input/output estimates from the official GPT-6 Luna model
+  page, checked 2026-10-18. Cached-input, cache-write, long-context, service-tier
+  and regional prices are not represented; estimates are not a vendor billing ceiling.

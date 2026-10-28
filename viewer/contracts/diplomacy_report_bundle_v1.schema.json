@@ -1,0 +1,546 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://llm-diplomacy.dev/contracts/diplomacy_report_bundle_v1.schema.json",
+  "title": "Diplomacy Report Bundle v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "bundle_id",
+    "source",
+    "map",
+    "game",
+    "roster",
+    "summary",
+    "strategic_arcs",
+    "years",
+    "messages",
+    "orders",
+    "private_records",
+    "evidence_index",
+    "extensions"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "diplomacy_report_bundle_v1"
+    },
+    "bundle_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "experiment_id",
+        "game_id",
+        "artifact_manifest_sha256",
+        "visibility_mode"
+      ]
+    },
+    "map": {
+      "type": "object",
+      "required": [
+        "map_id",
+        "geometry_version"
+      ]
+    },
+    "game": {
+      "type": "object",
+      "required": [
+        "title",
+        "years_played",
+        "outcome",
+        "provenance"
+      ],
+      "properties": {
+        "outcome": {
+          "$ref": "#/$defs/outcome"
+        }
+      }
+    },
+    "roster": {
+      "type": "array"
+    },
+    "summary": {
+      "type": "object",
+      "properties": {
+        "editorial": {
+          "$ref": "#/$defs/editorial"
+        }
+      }
+    },
+    "strategic_arcs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/editorialArc"
+      }
+    },
+    "years": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "year",
+          "phases"
+        ],
+        "properties": {
+          "year": {
+            "type": "integer"
+          },
+          "phases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/phase"
+            }
+          }
+        }
+      }
+    },
+    "messages": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/message"
+      }
+    },
+    "orders": {
+      "type": "object"
+    },
+    "private_records": {
+      "type": "object"
+    },
+    "evidence_index": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/evidence"
+      }
+    },
+    "extensions": {
+      "type": "object",
+      "properties": {
+        "audience": {
+          "$ref": "#/$defs/audienceMetadata"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "required": [
+        "source_id",
+        "artifact_path",
+        "sha256",
+        "visibility",
+        "kind"
+      ],
+      "properties": {
+        "visibility": {
+          "enum": [
+            "public",
+            "private",
+            "omniscient_postgame"
+          ]
+        },
+        "kind": {
+          "enum": [
+            "board_snapshot",
+            "orders",
+            "adjudication",
+            "message",
+            "private_record",
+            "report",
+            "manifest"
+          ]
+        },
+        "release_context": {
+          "const": "postgame_released_negotiation_transcript"
+        }
+      }
+    },
+    "audienceMetadata": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "policy_version",
+        "mode",
+        "reader_description",
+        "approved_for_static_public_distribution",
+        "projection"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "diplomacy_report_audience_v1"
+        },
+        "policy_version": {
+          "enum": [
+            "diplomacy_audience_policy_v1",
+            "diplomacy_full_postgame_release_v1"
+          ]
+        },
+        "mode": {
+          "enum": [
+            "omniscient_research",
+            "postgame_public",
+            "full_postgame_public"
+          ]
+        },
+        "reader_description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "approved_for_static_public_distribution": {
+          "type": "boolean"
+        },
+        "projection": {
+          "type": "object",
+          "required": [
+            "generator",
+            "source_bundle_id",
+            "source_bundle_sha256"
+          ],
+          "properties": {
+            "generator": {
+              "type": "string",
+              "minLength": 1
+            },
+            "source_bundle_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "source_bundle_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "required": [
+        "termination",
+        "leaders",
+        "solo_victor"
+      ],
+      "properties": {
+        "termination": {
+          "type": "object",
+          "required": [
+            "kind",
+            "label",
+            "final_year"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "scheduled_max_year",
+                "solo_victory",
+                "draw",
+                "other_recorded_reason"
+              ]
+            },
+            "label": {
+              "type": "string"
+            },
+            "final_year": {
+              "type": "integer"
+            },
+            "final_phase_id": {
+              "type": "string",
+              "pattern": "^[0-9]{4,}_fall_(movement|retreat)$"
+            }
+          }
+        },
+        "leaders": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "agent_id",
+              "power",
+              "supply_centers"
+            ]
+          }
+        },
+        "solo_victor": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "agent_id",
+            "power",
+            "supply_centers"
+          ],
+          "properties": {
+            "agent_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "power": {
+              "type": "string",
+              "minLength": 1
+            },
+            "supply_centers": {
+              "type": "integer",
+              "minimum": 18
+            }
+          }
+        }
+      }
+    },
+    "message": {
+      "type": "object",
+      "required": [
+        "message_id",
+        "phase_id",
+        "chronological_position",
+        "sender_agent_id",
+        "recipient_agent_ids",
+        "channel",
+        "thread_id",
+        "text",
+        "visibility",
+        "source_ref"
+      ]
+    },
+    "editorialCitation": {
+      "type": "object",
+      "required": [
+        "source_ref",
+        "label",
+        "evidence_type",
+        "target"
+      ],
+      "properties": {
+        "source_ref": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_type": {
+          "enum": [
+            "public",
+            "message",
+            "private_record",
+            "postgame"
+          ]
+        },
+        "target": {
+          "type": "object",
+          "required": [
+            "type",
+            "id"
+          ],
+          "properties": {
+            "type": {
+              "enum": [
+                "source",
+                "message",
+                "record",
+                "order"
+              ]
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "editorialClaim": {
+      "type": "object",
+      "required": [
+        "text",
+        "citations"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "citations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/editorialCitation"
+          }
+        }
+      }
+    },
+    "editorialArc": {
+      "type": "object",
+      "required": [
+        "title",
+        "claims"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "claims": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/editorialClaim"
+          }
+        }
+      }
+    },
+    "editorial": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "executive_history": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/editorialClaim"
+          }
+        },
+        "turning_points": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/editorialArc"
+          }
+        },
+        "power_dossiers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "power",
+              "agent_id",
+              "note"
+            ],
+            "properties": {
+              "power": {
+                "type": "string"
+              },
+              "agent_id": {
+                "type": "string"
+              },
+              "note": {
+                "$ref": "#/$defs/editorialClaim"
+              }
+            }
+          }
+        }
+      }
+    },
+    "editorialSection": {
+      "type": "object",
+      "required": [
+        "heading",
+        "claims",
+        "bridge"
+      ],
+      "properties": {
+        "heading": {
+          "type": "string"
+        },
+        "claims": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/editorialClaim"
+          }
+        },
+        "bridge": {
+          "$ref": "#/$defs/editorialClaim"
+        }
+      }
+    },
+    "narrative": {
+      "type": "object",
+      "properties": {
+        "editorial": {
+          "type": "object",
+          "required": [
+            "sections"
+          ],
+          "properties": {
+            "sections": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/editorialSection"
+              }
+            }
+          }
+        }
+      }
+    },
+    "phase": {
+      "type": "object",
+      "required": [
+        "phase_id",
+        "kind",
+        "year",
+        "season",
+        "board_before",
+        "board_after",
+        "messages",
+        "orders",
+        "adjudication",
+        "private_records",
+        "narrative",
+        "source_refs",
+        "extensions"
+      ],
+      "properties": {
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "orders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "private_records": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "narrative": {
+          "$ref": "#/$defs/narrative"
+        },
+        "source_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "phase_id": {
+          "type": "string",
+          "pattern": "^[0-9]{4,}_(spring|fall|winter)_(movement|retreat|adjustment)$"
+        },
+        "kind": {
+          "enum": [
+            "movement",
+            "retreat",
+            "adjustment"
+          ]
+        },
+        "year": {
+          "type": "integer",
+          "minimum": 1901
+        },
+        "season": {
+          "enum": [
+            "spring",
+            "fall",
+            "winter"
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.0",
+  "case_id": "T04",
+  "title": "Support cut by third-party attack",
+  "initial_state": {
+    "schema_version": "1.0",
+    "map_id": "standard",
+    "year": 1901,
+    "season": "spring",
+    "phase": "movement",
+    "units": [
+      {"schema_version": "1.0", "unit_id": "u_ger_a_mun", "owner": "germany", "type": "A", "province": "mun", "coast": null, "status": "active"},
+      {"schema_version": "1.0", "unit_id": "u_ger_a_ruh", "owner": "germany", "type": "A", "province": "ruh", "coast": null, "status": "active"},
+      {"schema_version": "1.0", "unit_id": "u_fra_a_bur", "owner": "france", "type": "A", "province": "bur", "coast": null, "status": "active"},
+      {"schema_version": "1.0", "unit_id": "u_ita_a_bel", "owner": "italy", "type": "A", "province": "bel", "coast": null, "status": "active"}
+    ],
+    "supply_ownership": {},
+    "home_centers": {}
+  },
+  "orders": [
+    {"schema_version": "1.0", "order_id": "o_mun_bur", "unit_ref": "u_ger_a_mun", "power": "germany", "type": "MOVE", "payload": {"from": "mun", "to": "bur"}},
+    {"schema_version": "1.0", "order_id": "o_ruh_support_mun_bur", "unit_ref": "u_ger_a_ruh", "power": "germany", "type": "SUPPORT_MOVE", "payload": {"from": "ruh", "supported_from": "mun", "supported_to": "bur"}},
+    {"schema_version": "1.0", "order_id": "o_bur_hold", "unit_ref": "u_fra_a_bur", "power": "france", "type": "HOLD", "payload": {"at": "bur"}},
+    {"schema_version": "1.0", "order_id": "o_bel_ruh", "unit_ref": "u_ita_a_bel", "power": "italy", "type": "MOVE", "payload": {"from": "bel", "to": "ruh"}}
+  ],
+  "expected": {
+    "movement_outcomes": {
+      "u_ger_a_mun": "held"
+    },
+    "support_outcomes": {
+      "u_ger_a_ruh": "cut"
+    }
+  }
+}

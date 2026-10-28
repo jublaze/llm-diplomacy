@@ -1,0 +1,68 @@
+# Monorepo package runtime and generated data
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.venv/
+**/venv/
+**/.tox/
+**/*.egg-info/
+
+# Viewer dependencies, builds, and local validation output
+**/node_modules/
+**/dist/
+**/dist-public/
+**/build/
+**/coverage/
+**/.vite/
+**/test-results/
+**/playwright-report/
+**/public/reports/
+**/public/catalog/
+**/public-build-input/
+**/public-build-input-*/
+**/public-build-demo/
+**/public-build-audits/
+**/reports/
+**/catalog/
+**/audits/
+
+# Framework run state and private agent material
+framework/agent_state/
+framework/agents_*/
+framework/logs/
+framework/run_logs/
+framework/run-output/
+framework/agents/*/persistent_memory.md
+framework/agents/*/runtime/
+framework/agents/*/logs/
+framework/agents/*/memory/*.jsonl
+framework/experiments/*
+!framework/experiments/configs/
+!framework/experiments/configs/*.yaml
+!framework/experiments/configs/*.json
+
+# Local credentials and environment files; retain example templates
+**/.aws/
+**/.env
+**/.env.*
+!**/.env.example
+**/standalone.env
+**/*.local.env
+**/*.key
+**/*.pem
+**/*.p12
+**/*.pfx
+**/secrets.*
+
+# Logs and temporary files
+**/*.log
+**/*.tmp
+.DS_Store
+Thumbs.db
+# Full-postgame build inputs/results are separate release artifacts.
+viewer/full-postgame-input*/
+viewer/dist-full-postgame/
+viewer/test-temp/
+publication/__pycache__/

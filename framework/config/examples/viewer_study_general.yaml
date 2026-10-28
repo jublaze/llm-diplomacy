@@ -1,0 +1,49 @@
+schema_version: "1.0"
+experiment_id: d-general
+agent_state_mode: fresh
+dry_run: false
+
+# Template for isolated fake-provider viewer studies. The study runner writes
+# selected copies below its fresh output root and supplies dedicated folio roots.
+agents:
+  - agent_id: a0
+    blueprint: blueprints/rowan.yaml
+    provider_config: {kind: fake, model: offline-study-fake}
+  - agent_id: a1
+    blueprint: blueprints/rowan.yaml
+    provider_config: {kind: fake, model: offline-study-fake}
+  - agent_id: a2
+    blueprint: blueprints/rowan.yaml
+    provider_config: {kind: fake, model: offline-study-fake}
+  - agent_id: a3
+    blueprint: blueprints/rowan.yaml
+    provider_config: {kind: fake, model: offline-study-fake}
+  - agent_id: a4
+    blueprint: blueprints/rowan.yaml
+    provider_config: {kind: fake, model: offline-study-fake}
+  - agent_id: a5
+    blueprint: blueprints/rowan.yaml
+    provider_config: {kind: fake, model: offline-study-fake}
+  - agent_id: a6
+    blueprint: blueprints/rowan.yaml
+    provider_config: {kind: fake, model: offline-study-fake}
+
+runtime:
+  kind: baseline_llm
+  provider: fake
+  max_ticks: 1
+  llm_agent_ids: [a0, a1, a2, a3, a4, a5, a6]
+
+games:
+  count: 1
+  max_year: 1901
+  country_assignment: fixed
+  seed: 20261016
+
+budget:
+  max_provider_calls: 200
+  stop_policy: stop_experiment
+
+outputs:
+  observatory: true
+  summary: true

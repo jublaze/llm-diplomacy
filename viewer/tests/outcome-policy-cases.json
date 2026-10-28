@@ -1,0 +1,8 @@
+[
+  {"name":"game_001_cutoff","raw":{"result":"completed","country_results":{"russia":{"agent_id":"shaver","owned_centers":12}}},"final_year":1910,"expected_kind":"scheduled_max_year","solo_victor":null},
+  {"name":"game_002_cutoff","raw":{"result":"completed","country_results":{"russia":{"agent_id":"major","owned_centers":10}}},"final_year":1910,"expected_kind":"scheduled_max_year","solo_victor":null},
+  {"name":"explicit_solo","raw":{"result":"solo_victory","final_phase_id":"1907_fall_movement","solo_victor":{"power":"france","agent_id":"a","owned_centers":18},"country_results":{"france":{"agent_id":"a","owned_centers":18}}},"final_year":1907,"expected_kind":"solo_victory","solo_victor":"france"},
+  {"name":"explicit_draw_at_cutoff","raw":{"result":"draw","country_results":{"france":{"agent_id":"a","owned_centers":12}}},"final_year":1910,"expected_kind":"draw","solo_victor":null},
+  {"name":"ambiguous_completed_18","raw":{"result":"completed","country_results":{"france":{"agent_id":"a","owned_centers":18}}},"final_year":1907,"expected_kind":"other_recorded_reason","solo_victor":null},
+  {"name":"contradictory_solo","raw":{"result":"solo_victory","country_results":{"france":{"agent_id":"a","owned_centers":12}}},"final_year":1907,"expected_kind":"other_recorded_reason","solo_victor":null}
+]

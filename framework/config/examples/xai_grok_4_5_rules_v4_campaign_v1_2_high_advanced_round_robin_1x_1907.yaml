@@ -1,0 +1,50 @@
+schema_version: "1.0"
+experiment_id: xai_grok_4_5_rules_v4_campaign_v1_2_high_advanced_round_robin_1x_1907
+comparison_group: grok_4_5_high_1907_rules_v4_campaign_v1_2_general_vs_advanced_profiles
+comparison_condition: three_advanced_profiles
+
+dry_run: false
+agent_state_mode: fresh
+
+agents:
+  - blueprints/cassandra.yaml
+  - blueprints/dorian.yaml
+  - blueprints/marcellus.yaml
+  - blueprints/seraphine.yaml
+  - blueprints/birsan.yaml
+  - blueprints/dolos.yaml
+  - blueprints/metternich.yaml
+
+runtime:
+  kind: baseline_llm
+  max_ticks: 1
+  llm_agent_ids:
+    - cassandra
+    - dorian
+    - marcellus
+    - seraphine
+    - birsan
+    - dolos
+    - metternich
+  provider_config:
+    model_profile: xai_grok_4_5
+    reasoning_effort: high
+    max_output_tokens: 2000
+    timeout_seconds: 300
+
+games:
+  count: 1
+  max_year: 1907
+  country_assignment: round_robin
+  seed: 2028
+
+budget:
+  max_provider_calls: 1500
+  max_input_tokens: 20000000
+  max_output_tokens: 5000000
+  max_estimated_cost_usd: 75.0
+  stop_policy: stop_experiment
+
+outputs:
+  observatory: true
+  summary: true

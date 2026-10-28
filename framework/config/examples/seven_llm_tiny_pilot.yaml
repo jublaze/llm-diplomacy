@@ -1,0 +1,53 @@
+schema_version: "1.0"
+experiment_id: seven_llm_tiny_pilot
+
+dry_run: false
+agent_state_mode: fresh
+
+agents:
+  - blueprints/cassandra.yaml
+  - blueprints/dorian.yaml
+  - blueprints/marcellus.yaml
+  - blueprints/seraphine.yaml
+  - blueprints/helena.yaml
+  - blueprints/victor.yaml
+  - blueprints/selene.yaml
+
+runtime:
+  kind: baseline_llm
+  provider: openai_compatible
+  max_ticks: 1
+  llm_agent_ids:
+    - cassandra
+    - dorian
+    - marcellus
+    - seraphine
+    - helena
+    - victor
+    - selene
+  provider_config:
+    kind: openai_compatible
+    model: gpt-4.1-mini
+    temperature: 0.2
+    max_output_tokens: 300
+    timeout_seconds: 60
+    pricing:
+      input_cost_per_1k_tokens: 0.0003
+      output_cost_per_1k_tokens: 0.0012
+
+games:
+  count: 1
+  max_year: 1901
+  country_assignment: fixed
+  seed: 2028
+
+budget:
+  max_provider_calls: 200
+  max_input_tokens: 150000
+  max_output_tokens: 35000
+  max_estimated_cost_usd: 7.0
+  stop_policy: stop_experiment
+
+outputs:
+  observatory: true
+  summary: true

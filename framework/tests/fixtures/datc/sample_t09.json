@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0",
+  "case_id": "T09",
+  "title": "Convoy disruption by dislodgement",
+  "initial_state": {
+    "schema_version": "1.0",
+    "map_id": "standard",
+    "year": 1901,
+    "season": "spring",
+    "phase": "movement",
+    "units": [
+      {"schema_version": "1.0", "unit_id": "u_eng_a_lon", "owner": "england", "type": "A", "province": "lon", "coast": null, "status": "active"},
+      {"schema_version": "1.0", "unit_id": "u_eng_f_eng", "owner": "england", "type": "F", "province": "eng", "coast": null, "status": "active"},
+      {"schema_version": "1.0", "unit_id": "u_fra_f_mao", "owner": "france", "type": "F", "province": "mao", "coast": null, "status": "active"},
+      {"schema_version": "1.0", "unit_id": "u_fra_f_iri", "owner": "france", "type": "F", "province": "iri", "coast": null, "status": "active"}
+    ],
+    "supply_ownership": {},
+    "home_centers": {}
+  },
+  "orders": [
+    {"schema_version": "1.0", "order_id": "o_lon_bre_via_convoy", "unit_ref": "u_eng_a_lon", "power": "england", "type": "MOVE", "payload": {"from": "lon", "to": "bre", "via_convoy": true}},
+    {"schema_version": "1.0", "order_id": "o_eng_convoy_lon_bre", "unit_ref": "u_eng_f_eng", "power": "england", "type": "CONVOY", "payload": {"from": "eng", "army_from": "lon", "army_to": "bre"}},
+    {"schema_version": "1.0", "order_id": "o_mao_eng", "unit_ref": "u_fra_f_mao", "power": "france", "type": "MOVE", "payload": {"from": "mao", "to": "eng"}},
+    {"schema_version": "1.0", "order_id": "o_iri_support_mao_eng", "unit_ref": "u_fra_f_iri", "power": "france", "type": "SUPPORT_MOVE", "payload": {"from": "iri", "supported_from": "mao", "supported_to": "eng"}}
+  ],
+  "expected": {
+    "movement_outcomes": {
+      "u_eng_f_eng": "dislodged",
+      "u_eng_a_lon": "held"
+    },
+    "convoy_outcomes": {
+      "u_eng_a_lon": "impossible"
+    }
+  }
+}
