@@ -14,6 +14,6 @@ For code changes, run relevant tests and `framework/scripts/security_scan.ps1`, 
 
 ## Experiment completion and viewer
 
-At experiment completion, strive to generate or update the viewer data and validate it against the completed run IDs and hashes. Check the deployed viewer's freshness against those same identifiers and hashes. Record any blocked generation, approval or publication as an issue or completion follow-up; do not claim the viewer is current until verified.
+At experiment completion, generate or update the viewer data and validate it against the completed run IDs and hashes. Check the deployed viewer's freshness against those same identifiers and hashes. If generation, approval or publication is blocked, record an issue or completion follow-up; do not claim the viewer is current until verified.
 
-The previously reviewed `luna1912-1018-r2` full postgame release and Pages deployment are authorized within their documented normalized-data boundary. Preserve the standard map's CC BY-SA attribution. That approval does not authorize publication of private artifacts from ongoing or new experiments. Obtain explicit approval for sensitive or otherwise unapproved datasets before publishing; do not silently update existing public data.
+The previously reviewed `luna1912-1018-r2` full postgame release and Pages deployment are authorized within the normalized-data boundary in [publication/README.md](publication/README.md). Preserve the standard map's CC BY-SA attribution. That approval does not authorize publication of private artifacts from ongoing or new experiments. Obtain explicit approval for sensitive or otherwise unapproved datasets before publishing; do not silently update existing public data.
