@@ -15,6 +15,7 @@ from typing import Any
 RECOVERY_VERSION = 1
 _RUSSIA_ADJUSTMENT_DECISION = "game_001/1903_winter_adjustment/once/russia/birsan_ii/submit_orders"
 JOURNAL_KINDS = {
+    "known_http_accounting_upgrade_v1",
     "build_rule_replay_transition_v1",
     "build_rule_replay_checkpoint_v1",
     "build_rule_boundary_adoption_v1",
@@ -1845,8 +1846,11 @@ class ExperimentRecovery:
 
     def _validate_build_rule_replay_checkpoint(self, entry: dict[str, Any], receipt: dict[str, Any],
                                                rows: list[dict[str, Any]]) -> None:
+        upgrades = [row for row in rows if row.get("kind") == "known_http_accounting_upgrade_v1"
+                    and row.get("sequence", -1) < entry.get("sequence", -1)]
+        expected_identity = upgrades[0]["to_identity"] if len(upgrades) == 1 else receipt.get("to_identity")
         if (entry.get("transition_sha256") != receipt.get("sha256")
-                or entry.get("identity") != receipt.get("to_identity")
+                or entry.get("identity") != expected_identity
                 or not isinstance(entry.get("state"), dict) or not isinstance(entry.get("applied"), list)):
             raise ValueError("build replay checkpoint receipt is invalid")
         cursor = entry.get("cursor")
@@ -1905,6 +1909,111 @@ class ExperimentRecovery:
         if cursor.get("unit") not in {"phase_started", "phase_completed"}:
             raise ValueError("build replay checkpoint is outside historical phases")
 
+    def _validate_known_http_upgrade(self, transition: dict[str, Any], rows: list[dict[str, Any]]) -> None:
+        upgrades = [row for row in rows if row.get("kind") == "known_http_accounting_upgrade_v1"]
+        if len(upgrades) != 1:
+            raise ValueError("known HTTP accounting upgrade is missing or duplicated")
+        upgrade = upgrades[0]
+        sequence = upgrade.get("sequence")
+        before, after = upgrade.get("from_identity"), upgrade.get("to_identity")
+        if (not isinstance(sequence, int) or isinstance(sequence, bool) or sequence < 1
+                or sequence >= len(rows) or upgrade.get("source_journal_count") != sequence
+                or upgrade.get("source_journal_head") != rows[sequence - 1].get("sha256")
+                or upgrade.get("previous_hash") != upgrade.get("source_journal_head")
+                or upgrade.get("transition_sha256") != transition.get("sha256")
+                or before != transition.get("to_identity") or after != self.identity
+                or {k: v for k, v in before.items() if k != "code_sha256"}
+                != {k: v for k, v in after.items() if k != "code_sha256"}):
+            raise ValueError("known HTTP upgrade identity or journal binding mismatch")
+        source, target = upgrade.get("source_code_manifest"), upgrade.get("target_code_manifest")
+        code_root = Path(__file__).parents[1]
+        actual = {p.relative_to(code_root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+                  for p in sorted(code_root.rglob("*")) if p.is_file() and not p.is_symlink()
+                  and "__pycache__" not in p.parts and p.suffix != ".pyc"}
+        if (source != transition.get("target_code_manifest") or not isinstance(target, dict)
+                or canonical_hash(source) != before.get("code_sha256")
+                or canonical_hash(target) != after.get("code_sha256") or actual != target
+                or {key for key in set(source) | set(target) if source.get(key) != target.get(key)}
+                != {"runner/recovery.py", "runner/build_rule_accounting.py", "runner/known_http_reservations.py"}):
+            raise ValueError("known HTTP upgrade package binding mismatch")
+        failure = upgrade.get("failure")
+        attempts = [row for row in rows[:sequence] if row.get("kind") == "attempt"
+                    and row.get("attempt_id") == (failure or {}).get("attempt_id")]
+        if (len(attempts) != 1 or attempts[0] != failure or failure.get("outcome") != "known_failed"
+                or failure.get("error_category") != "provider_transient_http"
+                or failure.get("response") is not None or failure.get("usage") is not None
+                or not any(row.get("kind") == "halt" and row.get("reason") == "provider_transient_http"
+                           and row.get("decision_id") == failure.get("decision_id")
+                           and failure["sequence"] < row.get("sequence", -1) < sequence for row in rows)):
+            raise ValueError("known HTTP upgrade lacks an exact halted HTTP failure")
+        checkpoint_backup = self.path / "known-http-source-checkpoint.json"
+        if _file_hash(checkpoint_backup) != upgrade.get("source_checkpoint_sha256"):
+            raise ValueError("known HTTP source checkpoint backup changed")
+        try:
+            source_checkpoint = json.loads(checkpoint_backup.read_bytes())
+            digest = source_checkpoint.pop("sha256")
+            anchor = source_checkpoint["journal_anchor"]
+            if (digest != canonical_hash(source_checkpoint) or source_checkpoint.get("identity") != before
+                    or not source_checkpoint.get("halt_required")
+                    or source_checkpoint.get("halt_reason") != "provider_transient_http"
+                    or source_checkpoint.get("decision_id") != failure.get("decision_id")
+                    or not isinstance(anchor.get("count"), int) or not 0 < anchor["count"] <= sequence
+                    or rows[anchor["count"] - 1].get("sha256") != anchor.get("head")):
+                raise ValueError("known HTTP source checkpoint is not the halted failure")
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            raise ValueError("known HTTP source checkpoint is invalid") from exc
+        for path, prefix in ((self.root / "metrics/provider_attempts.jsonl", "ledger"),
+                             (self.root / "metrics/budget/budget_events.jsonl", "budget_events")):
+            raw = path.read_bytes()
+            length = upgrade.get("source_" + prefix + "_bytes")
+            if (not isinstance(length, int) or isinstance(length, bool) or length < 0 or len(raw) < length
+                    or hashlib.sha256(raw[:length]).hexdigest() != upgrade.get("source_" + prefix + "_sha256")):
+                raise ValueError("known HTTP accounting prefix changed")
+        if _file_hash(self.path / "known-http-source-budget.json") != upgrade.get("source_budget_sha256"):
+            raise ValueError("known HTTP source budget backup changed")
+
+    def authorize_known_http_accounting_upgrade(self, *, target_code_manifest: dict[str, str],
+                                                attempt_id: str) -> None:
+        """Append compatibility evidence; never dispatch or edit a checkpoint."""
+        with RecoveryLock(self.path / "writer.lock"):
+            rows = self._journal_rows()
+            transitions = [row for row in rows if row.get("kind") == "build_rule_replay_transition_v1"]
+            failures = [row for row in rows if row.get("kind") == "attempt" and row.get("attempt_id") == attempt_id]
+            if (len(transitions) != 1 or len(failures) != 1
+                    or any(row.get("kind") == "known_http_accounting_upgrade_v1" for row in rows)
+                    or self.in_flight() or (self.path / "commit_manifest.json").exists()):
+                raise ValueError("known HTTP upgrade requires one halted unambiguous failure")
+            checkpoint = self._read_checkpoint()
+            if (not checkpoint or not checkpoint.get("halt_required")
+                    or checkpoint.get("halt_reason") != "provider_transient_http"
+                    or checkpoint.get("decision_id") != failures[0].get("decision_id")):
+                raise ValueError("known HTTP upgrade requires the exact halted checkpoint")
+            activation = [row for row in rows if row.get("kind") == "build_rule_activation_v1"]
+            if len(activation) != 1:
+                raise ValueError("known HTTP upgrade requires existing activation")
+            self._validate_build_rule_activation(activation[0], transitions[0], rows)
+            checkpoint_copy = self.path / "known-http-source-checkpoint.json"
+            budget_copy = self.path / "known-http-source-budget.json"
+            if checkpoint_copy.exists() or budget_copy.exists():
+                raise ValueError("known HTTP source backups already exist; review before retry")
+            _atomic_copy(self.checkpoint_path, checkpoint_copy)
+            _atomic_copy(self.root / "metrics/budget/budget_state.json", budget_copy)
+            ledger = (self.root / "metrics/provider_attempts.jsonl").read_bytes()
+            events = (self.root / "metrics/budget/budget_events.jsonl").read_bytes()
+            payload = {"kind": "known_http_accounting_upgrade_v1", "transition_sha256": transitions[0]["sha256"],
+                       "from_identity": transitions[0]["to_identity"], "to_identity": self.identity,
+                       "source_code_manifest": transitions[0]["target_code_manifest"],
+                       "target_code_manifest": target_code_manifest, "failure": failures[0],
+                       "source_journal_count": len(rows), "source_journal_head": rows[-1]["sha256"],
+                       "source_checkpoint_sha256": _file_hash(checkpoint_copy),
+                       "source_budget_sha256": _file_hash(budget_copy),
+                       "source_ledger_bytes": len(ledger), "source_ledger_sha256": hashlib.sha256(ledger).hexdigest(),
+                       "source_budget_events_bytes": len(events), "source_budget_events_sha256": hashlib.sha256(events).hexdigest()}
+            provisional = {**payload, "sequence": len(rows), "previous_hash": rows[-1]["sha256"]}
+            provisional["sha256"] = canonical_hash(provisional)
+            self._validate_known_http_upgrade(transitions[0], [*rows, provisional])
+            self._append(payload)
+
     def _validate_build_rule_replay_transition(self, receipt: dict[str, Any],
                                                rows: list[dict[str, Any]]) -> None:
         """Validate an append-only replay-only transition; it does not authorize adoption."""
@@ -1919,10 +2028,12 @@ class ExperimentRecovery:
             raise ValueError("build replay transition journal prefix mismatch")
         source, target = receipt.get("from_identity"), receipt.get("to_identity")
         if (not isinstance(source, dict) or not isinstance(target, dict)
-                or target != self.identity or source.get("experiment_id") != self.root.name
+                or source.get("experiment_id") != self.root.name
                 or {k: v for k, v in source.items() if k != "code_sha256"}
                 != {k: v for k, v in target.items() if k != "code_sha256"}):
             raise ValueError("build replay transition changed experiment identity or configuration")
+        if target != self.identity:
+            self._validate_known_http_upgrade(receipt, rows)
         old_manifest, new_manifest = receipt.get("source_code_manifest"), receipt.get("target_code_manifest")
         if (not isinstance(old_manifest, dict) or not isinstance(new_manifest, dict)
                 or canonical_hash(old_manifest) != source.get("code_sha256")
@@ -2184,11 +2295,14 @@ class ExperimentRecovery:
             current_budget = json.loads((self.root / "metrics/budget/budget_state.json").read_bytes())
             baseline_ledger = ledger_backup.read_bytes()
             current_ledger = (self.root / "metrics/provider_attempts.jsonl").read_bytes()
+            events_path = self.root / "metrics/budget/budget_events.jsonl"
+            budget_events = ([json.loads(line) for line in events_path.read_bytes().splitlines() if line]
+                             if events_path.exists() else [])
         except (OSError, ValueError) as exc:
             raise ValueError("build rule activation accounting is unreadable") from exc
         validate_postactivation_accounting(baseline_ledger=baseline_ledger, current_ledger=current_ledger,
             baseline_budget=baseline_budget, current_budget=current_budget, rows=rows,
-            activation_sequence=activation["sequence"])
+            activation_sequence=activation["sequence"], budget_events=budget_events)
 
     def _validate_build_rule_boundary_validation(self, validation: dict[str, Any], transition: dict[str, Any],
             adoption: dict[str, Any], activation: dict[str, Any], rows: list[dict[str, Any]]) -> None:

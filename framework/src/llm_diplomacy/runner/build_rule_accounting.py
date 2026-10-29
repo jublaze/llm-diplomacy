@@ -11,18 +11,20 @@ from typing import Any
 
 def validate_postactivation_accounting(*, baseline_ledger: bytes, current_ledger: bytes,
         baseline_budget: dict[str, Any], current_budget: dict[str, Any],
-        rows: list[dict[str, Any]], activation_sequence: int) -> None:
+        rows: list[dict[str, Any]], activation_sequence: int,
+        budget_events: list[dict[str, Any]] | None = None) -> None:
     if not current_ledger.startswith(baseline_ledger) or (baseline_ledger and not baseline_ledger.endswith(b"\n")):
         raise ValueError("provider ledger prefix changed")
     static = ("schema_version", "experiment_id", "config_fingerprint", "max_provider_calls",
               "max_input_tokens", "max_output_tokens", "max_estimated_cost_usd", "stop_policy")
     if any(current_budget.get(key) != baseline_budget.get(key) for key in static):
         raise ValueError("budget configuration changed")
-    if current_budget.get("pending_reservations") != baseline_budget.get("pending_reservations"):
-        raise ValueError("historical reserves changed or new unresolved exposure exists")
-    for field in ("pending_input_tokens", "pending_output_tokens", "pending_cost_usd"):
-        if current_budget.get(field) != baseline_budget.get(field):
-            raise ValueError("historical reserved totals changed")
+    old_reserves = baseline_budget.get("pending_reservations")
+    reserves = current_budget.get("pending_reservations")
+    if not isinstance(old_reserves, dict) or not isinstance(reserves, dict) or any(
+            reserves.get(key) != value for key, value in old_reserves.items()):
+        raise ValueError("historical reserves changed")
+    additional_reserves = {key: value for key, value in reserves.items() if key not in old_reserves}
     if any(current_budget.get(key) for key in ("stop_experiment", "stop_game_after_phase", "force_fallback")):
         raise ValueError("budget is stopped or fallback is active")
     try:
@@ -45,20 +47,34 @@ def validate_postactivation_accounting(*, baseline_ledger: bytes, current_ledger
     if len({row.get("attempt_id") for row in dispatches}) != len(dispatches):
         raise ValueError("post-activation dispatch identities are duplicated")
     totals = {"input_tokens": 0, "output_tokens": 0, "estimated_cost_usd": 0.0}
-    for request, dispatch in zip(requests, dispatches):
+    failures = []
+    for index, (request, dispatch) in enumerate(zip(requests, dispatches)):
         parts = dispatch.get("decision_id", "").split("/")
         if len(parts) != 6 or any(request.get(key) != value for key, value in
                 {"game_id": parts[0], "phase_id": parts[1], "agent_id": parts[4], "method": parts[5]}.items()):
             raise ValueError("post-activation request and dispatch identity mismatch")
         results = [row for row in rows if row.get("kind") == "attempt" and row.get("attempt_id") == dispatch.get("attempt_id")]
         starts = [row for row in prepared if row.get("attempt_id") == dispatch.get("attempt_id")]
-        if (request.get("error_type") or len(results) != 1 or results[0].get("outcome") != "received"
-                or len(starts) != 1 or starts[0].get("decision_id") != dispatch.get("decision_id")
+        if (len(results) != 1 or len(starts) != 1 or starts[0].get("decision_id") != dispatch.get("decision_id")
                 or starts[0].get("prompt_hash") != dispatch.get("prompt_hash")
                 or not (activation_sequence < starts[0].get("sequence", -1) < dispatch.get("sequence", -1)
                         < results[0].get("sequence", -1))
                 or results[0].get("decision_id") != dispatch.get("decision_id")
                 or results[0].get("prompt_hash") != dispatch.get("prompt_hash")):
+            raise ValueError("post-activation provider outcome requires review")
+        result = results[0]
+        if result.get("outcome") == "known_failed":
+            if (result.get("error_category") != "provider_transient_http" or request.get("error_type") != "ProviderHTTPError"
+                    or result.get("response") is not None or result.get("usage") is not None
+                    or any(request.get(key) is not None for key in totals)):
+                raise ValueError("post-activation provider outcome requires review")
+            next_start = next((item.get("started_at") for item in prepared[index + 1:]
+                               if item.get("started_at")), None)
+            failures.append({"attempt_id": dispatch["attempt_id"], "experiment_id": current_budget["experiment_id"],
+                             "identity": {"game_id": parts[0], "phase_id": parts[1], "agent_id": parts[4], "method": parts[5]},
+                             "started_at": starts[0]["started_at"], "next_started_at": next_start})
+            continue
+        if request.get("error_type") or result.get("outcome") != "received":
             raise ValueError("post-activation provider outcome requires review")
         usage = results[0].get("usage")
         if not isinstance(usage, dict):
@@ -73,6 +89,24 @@ def validate_postactivation_accounting(*, baseline_ledger: bytes, current_ledger
                     or abs(actual - value) > 1e-8):
                 raise ValueError("post-activation journal usage differs from ledger")
             totals[key] += value
+    from .known_http_reservations import match_http_reservations
+    match_http_reservations(failures, additional_reserves, budget_events or [])
+    reserve_increments = {"input_tokens": 0, "output_tokens": 0, "estimated_cost_usd": 0.0}
+    for reserve in additional_reserves.values():
+        for key, field in (("input_tokens", "input_tokens"), ("output_tokens", "output_tokens"),
+                           ("estimated_cost_usd", "cost_usd")):
+            value = reserve.get(field)
+            if (isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0
+                    or key != "estimated_cost_usd" and not isinstance(value, int)):
+                raise ValueError("retained HTTP reservation is invalid")
+            reserve_increments[key] += value
+    for key, field in (("input_tokens", "pending_input_tokens"), ("output_tokens", "pending_output_tokens"),
+                       ("estimated_cost_usd", "pending_cost_usd")):
+        before, after = baseline_budget.get(field), current_budget.get(field)
+        if (any(isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0
+                or key != "estimated_cost_usd" and not isinstance(value, int) for value in (before, after))
+                or abs(after - before - reserve_increments[key]) > 1e-8):
+            raise ValueError("historical reserved totals changed")
     if current_budget.get("total_provider_calls") != baseline_budget.get("total_provider_calls", -1) + len(requests):
         raise ValueError("post-activation provider call count differs from budget")
     for key, increment in totals.items():
@@ -82,7 +116,7 @@ def validate_postactivation_accounting(*, baseline_ledger: bytes, current_ledger
                 or abs(after - before - increment) > 1e-8):
             raise ValueError("post-activation known usage differs from ledger")
         old_total, new_total = baseline_budget.get("total_" + key), current_budget.get("total_" + key)
-        if old_total is None:
+        if old_total is None or additional_reserves:
             if new_total is not None:
                 raise ValueError("uncertain historical total was cleared")
         elif (isinstance(old_total, bool) or not isinstance(old_total, (int, float))
@@ -96,7 +130,7 @@ def validate_postactivation_accounting(*, baseline_ledger: bytes, current_ledger
         if (isinstance(old_admission, bool) or not isinstance(old_admission, (int, float))
                 or isinstance(new_admission, bool) or not isinstance(new_admission, (int, float))
                 or not math.isfinite(old_admission) or not math.isfinite(new_admission)
-                or abs(new_admission - old_admission - increment) > 1e-8):
+              or abs(new_admission - old_admission - increment - reserve_increments[key]) > 1e-8):
             raise ValueError("post-activation budget admission differs from known usage and reserves")
         limit = current_budget.get("max_" + key)
         if limit is not None and new_admission > limit:
