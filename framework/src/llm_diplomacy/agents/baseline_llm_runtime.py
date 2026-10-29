@@ -815,6 +815,8 @@ class BaselineLLMAgentRuntime(AgentRuntime):
                 and (issue == "adjustment requires empty orders when no build/disband is required"
                      or issue.startswith("adjustment requires exactly ")
                      and issue.endswith((" BUILD orders", " DISBAND orders"))
+                     or issue.startswith("adjustment permits at most ")
+                     or issue.startswith("duplicate adjustment ")
                      or issue in {"adjustment requires BUILD orders only",
                                   "adjustment requires DISBAND orders only"}
                      or issue in {"illegal adjustment order payload for BUILD",
@@ -2062,6 +2064,7 @@ class BaselineLLMAgentRuntime(AgentRuntime):
         context: AgentContext | None,
         built_context: dict[str, Any] | None,
         orders: list[dict[str, Any]],
+        legacy_adjustment: bool = False,
     ) -> str | None:
         if context is None or built_context is None:
             return None
@@ -2086,8 +2089,15 @@ class BaselineLLMAgentRuntime(AgentRuntime):
                     return "adjustment requires empty orders when no build/disband is required"
                 return None
             expected_type = "BUILD" if obligation == "build" else "DISBAND"
-            if required_count > 0 and len(orders) != required_count:
+            if obligation == "build" and not legacy_adjustment:
+                sites = {row.get("payload", {}).get("province") for row in legal_options
+                         if isinstance(row, dict) and isinstance(row.get("payload"), dict)}
+                maximum = min(int(adjustment.get("delta", 0)), len(sites))
+                if len(orders) > maximum:
+                    return f"adjustment permits at most {maximum} BUILD orders"
+            elif required_count > 0 and len(orders) != required_count:
                 return f"adjustment requires exactly {required_count} {expected_type} orders"
+            seen = set()
             for row in orders:
                 if not isinstance(row, dict):
                     return "adjustment order entry must be object"
@@ -2097,6 +2107,11 @@ class BaselineLLMAgentRuntime(AgentRuntime):
                 signature = self._order_signature(row_type, row.get("payload", {}))
                 if signature not in legal_signatures:
                     return f"illegal adjustment order payload for {row_type}"
+                payload = row.get("payload", {})
+                identity = payload.get("province") if obligation == "build" else payload.get("unit_ref")
+                if not legacy_adjustment and identity in seen:
+                    return f"duplicate adjustment {'province' if obligation == 'build' else 'unit_ref'}: {identity}"
+                seen.add(identity)
             return None
 
         signatures_by_unit = legal.get("legal_order_signatures_by_unit", {})
