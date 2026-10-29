@@ -21,6 +21,19 @@ sys.path.insert(0,str(Path(__file__).resolve().parent))
 from recover_provider_responses import reconcile_accounting, ReadOnlyBudget
 
 
+def runtime_code_sha():
+    import llm_diplomacy
+    root = Path(llm_diplomacy.__file__).resolve().parent
+    expected = (Path(__file__).resolve().parents[1] / 'src' / 'llm_diplomacy').resolve()
+    if root != expected:
+        raise ValueError('Handoff imported a different runtime package')
+    if any(p.is_symlink() or getattr(p, 'is_junction', lambda: False)() for p in root.rglob('*')):
+        raise ValueError('Handoff runtime package cannot contain links')
+    manifest = {p.relative_to(root).as_posix(): digest(p) for p in sorted(root.rglob('*'))
+                if p.is_file() and not p.is_symlink() and '__pycache__' not in p.parts and p.suffix != '.pyc'}
+    return canonical_hash(manifest)
+
+
 def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
@@ -47,13 +60,21 @@ def remaining_limits(policy, budget):
     return result
 
 
-def verify_receipt(destination, policy_path, template_path, source):
+def verify_receipt(destination, policy_path, template_path, source, expected_code_sha256, expected_entrypoint_sha256, expected_wrapper_sha256):
     receipt = json.loads((destination/'handoff_receipt.json').read_text())
     body = {k:v for k,v in receipt.items() if k != 'sha256'}
     if receipt.get('sha256') != canonical_hash(body):
         raise ValueError('Handoff receipt integrity mismatch')
     if receipt['policy_sha256'] != digest(policy_path) or receipt['template_sha256'] != digest(template_path):
         raise ValueError('Handoff policy/template changed')
+    if receipt.get('runtime_code_sha256') != expected_code_sha256 or runtime_code_sha() != expected_code_sha256:
+        raise ValueError('Handoff runtime package differs from the sealed source')
+    script_dir = Path(__file__).resolve().parent
+    if (receipt.get('runtime_entrypoint_sha256') != expected_entrypoint_sha256
+            or receipt.get('runtime_wrapper_sha256') != expected_wrapper_sha256
+            or digest(script_dir/'run_population_experiment.py') != expected_entrypoint_sha256
+            or digest(script_dir/'run_sealed_population.py') != expected_wrapper_sha256):
+        raise ValueError('Handoff runtime entrypoints differ from the sealed source')
     if Path(receipt['source_root']) != source:
         raise ValueError('Handoff source changed')
     for record in receipt['source_files']:
@@ -69,13 +90,20 @@ def verify_receipt(destination, policy_path, template_path, source):
     return receipt
 
 
-def prepare(policy_path, template_path, source, destination, no_writer_proof):
+def prepare(policy_path, template_path, source, destination, no_writer_proof, expected_code_sha256,
+            expected_entrypoint_sha256, expected_wrapper_sha256):
     policy_path, template_path, source, destination = map(lambda p: Path(p).resolve(),
                                                         (policy_path, template_path, source, destination))
     if destination == source or source in destination.parents or destination in source.parents:
         raise ValueError('Source and destination must be isolated')
+    if runtime_code_sha() != expected_code_sha256:
+        raise ValueError('Handoff runtime package differs from the reviewed code identity')
+    script_dir = Path(__file__).resolve().parent
+    if (digest(script_dir/'run_population_experiment.py') != expected_entrypoint_sha256
+            or digest(script_dir/'run_sealed_population.py') != expected_wrapper_sha256):
+        raise ValueError('Handoff runtime entrypoints differ from the reviewed identity')
     if destination.exists():
-        return verify_receipt(destination, policy_path, template_path, source)
+        return verify_receipt(destination, policy_path, template_path, source, expected_code_sha256, expected_entrypoint_sha256, expected_wrapper_sha256)
     policy = json.loads(policy_path.read_text())
     if policy['total_usd'] != 175 or policy['total_calls'] != 6968 or policy['total_input_tokens'] != 79678408 or policy['total_output_tokens'] != 222976000 or policy['total_wall_seconds'] != 518400:
         raise ValueError('Policy differs from the approved Terra arm totals')
@@ -93,11 +121,24 @@ def prepare(policy_path, template_path, source, destination, no_writer_proof):
     config = load_population_experiment_config(source/'launch.yaml')
     if config.experiment_id != policy['source_experiment_id'] or config.game_count != 1:
         raise ValueError('Unexpected first-game identity/count')
+    # The original prompt assets are bound from the exact source checkpoint
+    # backup; normal recovery validation verifies this receipt under the lock.
+    from llm_diplomacy.runner.recovery import ExperimentRecovery
+    from llm_diplomacy.core.prompt_assets import bind_checkpoint_prompt_assets
+    probe = ExperimentRecovery(source, identity={}, resume=True)
+    transitions = [row for row in probe._journal_rows() if row.get('kind') == 'build_rule_replay_transition_v1']
+    if transitions:
+        if len(transitions) != 1:
+            raise ValueError('Unexpected source transition count')
+        bind_checkpoint_prompt_assets(source/'recovery/build-rule-source-checkpoint.json',
+            expected_file_sha256=transitions[0]['source_checkpoint_file_sha256'])
     runner = PopulationExperimentRunner(config=config,base_dir=source.parents[1],agents_root=source/'agents')
     recovery = runner._recovery_store()
+    if recovery.identity.get('code_sha256') != expected_code_sha256:
+        raise ValueError('First-game recovery does not use the sealed runtime package')
     with RecoveryLock(recovery.path/'writer.lock'):
         if destination.exists():
-            return verify_receipt(destination, policy_path, template_path, source)
+            return verify_receipt(destination, policy_path, template_path, source, expected_code_sha256, expected_entrypoint_sha256, expected_wrapper_sha256)
         status = recovery.status()
         checkpoint = recovery._read_checkpoint()
         if not status['checkpoint_valid'] or status.get('in_flight') or recovery.safe_halt_path.exists() or checkpoint.get('cursor',{}).get('unit') != 'population_reports_completed' or (recovery.path/'commit_manifest.json').exists():
@@ -141,6 +182,8 @@ def prepare(policy_path, template_path, source, destination, no_writer_proof):
         staged.mkdir(parents=True,exist_ok=False)
         source_paths = ['launch.yaml','recovery/checkpoint.json','recovery/journal.jsonl',
                         'metrics/budget/budget_state.json','metrics/provider_attempts.jsonl','run_summary.json']
+        if transitions:
+            source_paths.append('recovery/build-rule-source-checkpoint.json')
         destination_paths = ['launch.yaml']
         for player in config.players:
             for directory in ('memory','games'):
@@ -154,6 +197,8 @@ def prepare(policy_path, template_path, source, destination, no_writer_proof):
                 source_paths.append(relative);destination_paths.append(relative)
         (staged/'launch.yaml').write_text(yaml.safe_dump(next_config,sort_keys=False),encoding='utf-8')
         receipt = {'schema_version':1,'state':'PREPARED_PARENT_LAUNCH_ONLY','source_root':str(source),
+            'runtime_code_sha256':expected_code_sha256,
+            'runtime_entrypoint_sha256':expected_entrypoint_sha256, 'runtime_wrapper_sha256':expected_wrapper_sha256,
             'policy_sha256':digest(policy_path),'template_sha256':digest(template_path),'no_writer_proof_sha256':digest(proof_path),
             'shared_total_usd':175,'source_admission_exposure':budget['budget_admission_estimated_cost_usd'],
             'remaining_limits':limits,'arm_deadline_utc':deadline.isoformat(),'accounting_proof':accounting_proof,
@@ -165,12 +210,16 @@ def prepare(policy_path, template_path, source, destination, no_writer_proof):
             if path.is_file():
                 with path.open('r+b') as handle: os.fsync(handle.fileno())
         os.replace(staged,destination)
-        return verify_receipt(destination,policy_path,template_path,source)
+        return verify_receipt(destination,policy_path,template_path,source,expected_code_sha256,expected_entrypoint_sha256,expected_wrapper_sha256)
 
 
 if __name__ == '__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     for name in ('policy','template','source','destination','no-writer-proof'): parser.add_argument('--'+name,required=True)
+    parser.add_argument('--expected-code-sha256',required=True)
+    parser.add_argument('--expected-entrypoint-sha256',required=True)
+    parser.add_argument('--expected-wrapper-sha256',required=True)
     args=parser.parse_args()
-    receipt=prepare(args.policy,args.template,args.source,args.destination,args.no_writer_proof)
+    receipt=prepare(args.policy,args.template,args.source,args.destination,args.no_writer_proof,args.expected_code_sha256,
+                    args.expected_entrypoint_sha256,args.expected_wrapper_sha256)
     print(json.dumps({'state':receipt['state'],'remaining_limits':receipt['remaining_limits'],'sha256':receipt['sha256']}))

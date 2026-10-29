@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import hashlib
+import json
 
 DEFAULT_STRATEGIC_IMPERATIVES = (
     "strategic_imperatives_version: strategic_imperatives_v2_1_campaign_oriented\n"
@@ -44,21 +45,61 @@ OUTCOME_REVIEW_INSTRUCTION = (
 )
 OUTCOME_REVIEW_SHA256 = f"sha256:{hashlib.sha256(OUTCOME_REVIEW_INSTRUCTION.encode('utf-8')).hexdigest()}"
 
+_BOUND_PROMPT_ASSETS: dict[str, Path] | None = None
+
+
+def bind_checkpoint_prompt_assets(checkpoint_path: str | Path, *, expected_file_sha256: str) -> None:
+    """Bind exact historical asset paths for an isolated, still-gated recovery process.
+
+    This validates assets only. It neither authorizes an identity transition nor
+    starts or modifies recovery; the normal recovery checks remain mandatory.
+    """
+    global _BOUND_PROMPT_ASSETS
+    checkpoint_path = Path(checkpoint_path)
+    if not checkpoint_path.is_file() or checkpoint_path.is_symlink():
+        raise ValueError("checkpoint must be a regular file")
+    raw = checkpoint_path.read_bytes()
+    if hashlib.sha256(raw).hexdigest() != expected_file_sha256:
+        raise ValueError("checkpoint bytes differ from reviewed binding")
+    checkpoint = json.loads(raw)
+    digest = checkpoint.pop("sha256", None)
+    encoded = json.dumps(checkpoint, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    if checkpoint.get("version") != 1 or hashlib.sha256(encoded).hexdigest() != digest or not checkpoint.get("halt_required"):
+        raise ValueError("binding requires a valid halted checkpoint")
+    assets = checkpoint.get("identity", {}).get("prompt_assets")
+    names = {"strategic_imperatives", "victory_campaign_doctrine", "diplomacy_primer"}
+    if not isinstance(assets, dict) or set(assets) != names:
+        raise ValueError("checkpoint prompt asset identity is incomplete")
+    bound: dict[str, Path] = {}
+    for name in sorted(names):
+        entry = assets[name]
+        if not isinstance(entry, dict) or set(entry) != {"path", "sha256"}:
+            raise ValueError("checkpoint prompt asset identity is invalid")
+        path = Path(entry["path"])
+        if not path.is_absolute() or path.is_symlink() or not path.is_file() or str(path.resolve()) != entry["path"]:
+            raise ValueError("historical prompt asset path is invalid")
+        if hashlib.sha256(path.read_bytes()).hexdigest() != entry["sha256"]:
+            raise ValueError("historical prompt asset bytes changed")
+        bound[name] = path
+    if _BOUND_PROMPT_ASSETS is not None and _BOUND_PROMPT_ASSETS != bound:
+        raise ValueError("prompt assets are already bound to another checkpoint")
+    _BOUND_PROMPT_ASSETS = bound
+
 
 def project_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
 
 def canonical_strategic_imperatives_path() -> Path:
-    return project_root() / "strategic_imperatives.md"
+    return _BOUND_PROMPT_ASSETS["strategic_imperatives"] if _BOUND_PROMPT_ASSETS is not None else project_root() / "strategic_imperatives.md"
 
 
 def canonical_victory_campaign_doctrine_path() -> Path:
-    return project_root() / "victory_campaign_doctrine.md"
+    return _BOUND_PROMPT_ASSETS["victory_campaign_doctrine"] if _BOUND_PROMPT_ASSETS is not None else project_root() / "victory_campaign_doctrine.md"
 
 
 def canonical_diplomacy_primer_path() -> Path:
-    return project_root() / "diplomacy_primer.md"
+    return _BOUND_PROMPT_ASSETS["diplomacy_primer"] if _BOUND_PROMPT_ASSETS is not None else project_root() / "diplomacy_primer.md"
 
 
 def read_prompt_asset(path: str | Path, *, fallback: str) -> str:
