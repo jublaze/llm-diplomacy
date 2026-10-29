@@ -287,7 +287,11 @@ def reconcile_accounting(runner, recovery, *, request_rows=None, dry_run=False, 
     recovery._validate_journal_semantics(rows)
     cp = recovery._read_checkpoint()
     terminal_read_only = dry_run and cp is not None and cp.get("cursor", {}).get("unit") == "population_reports_completed"
-    if cp is None or cp["identity"] != recovery.identity or not (cp.get("halt_required") or terminal_read_only):
+    upgrades = [row for row in rows if row.get("kind") == "terminal_currency_accounting_upgrade_v1"]
+    terminal_compatible = (terminal_read_only and len(upgrades) == 1
+                           and upgrades[0].get("from_identity") == cp.get("identity")
+                           and upgrades[0].get("to_identity") == recovery.identity)
+    if cp is None or (cp["identity"] != recovery.identity and not terminal_compatible) or not (cp.get("halt_required") or terminal_read_only):
         raise ValueError("accounting reconciliation requires the same halted identity")
     if request_rows is not None and not dry_run:
         raise ValueError("proposed request rows require a dry run")

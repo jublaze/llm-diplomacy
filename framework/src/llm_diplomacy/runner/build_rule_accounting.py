@@ -86,7 +86,7 @@ def validate_postactivation_accounting(*, baseline_ledger: bytes, current_ledger
                 raise ValueError("post-activation provider usage is incomplete")
             actual = usage.get(key)
             if (isinstance(actual, bool) or not isinstance(actual, (int, float)) or not math.isfinite(actual)
-                    or abs(actual - value) > 1e-8):
+                    or actual != value):
                 raise ValueError("post-activation journal usage differs from ledger")
             totals[key] += value
     from .known_http_reservations import match_http_reservations
@@ -105,8 +105,15 @@ def validate_postactivation_accounting(*, baseline_ledger: bytes, current_ledger
         before, after = baseline_budget.get(field), current_budget.get(field)
         if (any(isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0
                 or key != "estimated_cost_usd" and not isinstance(value, int) for value in (before, after))
-                or abs(after - before - reserve_increments[key]) > 1e-8):
+                or (key != "estimated_cost_usd" or additional_reserves)
+                   and abs(after - before - reserve_increments[key]) > 1e-8):
             raise ValueError("historical reserved totals changed")
+        if key == "estimated_cost_usd" and not additional_reserves:
+            if after != before and not budget_events:
+                raise ValueError("reservation trace required for changed pending cost")
+            if budget_events:
+                from .reservation_currency_trace import verify_pending_currency_trace
+                verify_pending_currency_trace(baseline_budget, current_budget, budget_events, requests)
     if current_budget.get("total_provider_calls") != baseline_budget.get("total_provider_calls", -1) + len(requests):
         raise ValueError("post-activation provider call count differs from budget")
     for key, increment in totals.items():

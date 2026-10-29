@@ -184,6 +184,10 @@ def prepare(policy_path, template_path, source, destination, no_writer_proof, ex
                         'metrics/budget/budget_state.json','metrics/provider_attempts.jsonl','run_summary.json']
         if transitions:
             source_paths.append('recovery/build-rule-source-checkpoint.json')
+        if any(row.get('kind') == 'terminal_currency_accounting_upgrade_v1' for row in recovery._journal_rows()):
+            source_paths.extend(['metrics/budget/budget_events.jsonl',
+                                 'recovery/terminal-currency-source-checkpoint.json',
+                                 'recovery/terminal-currency-source-budget.json'])
         destination_paths = ['launch.yaml']
         for player in config.players:
             for directory in ('memory','games'):

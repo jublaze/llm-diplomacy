@@ -15,6 +15,7 @@ from typing import Any
 RECOVERY_VERSION = 1
 _RUSSIA_ADJUSTMENT_DECISION = "game_001/1903_winter_adjustment/once/russia/birsan_ii/submit_orders"
 JOURNAL_KINDS = {
+    "terminal_currency_accounting_upgrade_v1",
     "known_http_accounting_upgrade_v1",
     "build_rule_replay_transition_v1",
     "build_rule_replay_checkpoint_v1",
@@ -1846,7 +1847,7 @@ class ExperimentRecovery:
 
     def _validate_build_rule_replay_checkpoint(self, entry: dict[str, Any], receipt: dict[str, Any],
                                                rows: list[dict[str, Any]]) -> None:
-        upgrades = [row for row in rows if row.get("kind") == "known_http_accounting_upgrade_v1"
+        upgrades = [row for row in rows if row.get("kind") in {"known_http_accounting_upgrade_v1", "terminal_currency_accounting_upgrade_v1"}
                     and row.get("sequence", -1) < entry.get("sequence", -1)]
         expected_identity = upgrades[0]["to_identity"] if len(upgrades) == 1 else receipt.get("to_identity")
         if (entry.get("transition_sha256") != receipt.get("sha256")
@@ -1908,6 +1909,93 @@ class ExperimentRecovery:
                 raise ValueError("build replay checkpoint is outside historical phases")
         if cursor.get("unit") not in {"phase_started", "phase_completed"}:
             raise ValueError("build replay checkpoint is outside historical phases")
+
+    def _validate_terminal_currency_upgrade(self, transition: dict[str, Any], rows: list[dict[str, Any]]) -> None:
+        upgrades = [row for row in rows if row.get("kind") == "terminal_currency_accounting_upgrade_v1"]
+        if len(upgrades) != 1:
+            raise ValueError("terminal currency upgrade is missing or duplicated")
+        upgrade = upgrades[0]
+        sequence = upgrade.get("sequence")
+        before, after = upgrade.get("from_identity"), upgrade.get("to_identity")
+        if (not isinstance(sequence, int) or isinstance(sequence, bool) or not 0 < sequence < len(rows)
+                or upgrade.get("source_journal_count") != sequence or upgrade.get("source_journal_head") != rows[sequence-1].get("sha256")
+                or upgrade.get("previous_hash") != upgrade.get("source_journal_head")
+                or upgrade.get("transition_sha256") != transition.get("sha256")
+                or before != transition.get("to_identity") or after != self.identity
+                or {k:v for k,v in before.items() if k != "code_sha256"}
+                != {k:v for k,v in after.items() if k != "code_sha256"}):
+            raise ValueError("terminal currency identity or journal binding mismatch")
+        source, target = upgrade.get("source_code_manifest"), upgrade.get("target_code_manifest")
+        code_root = Path(__file__).parents[1]
+        entries = list(code_root.rglob("*"))
+        if any(p.is_symlink() or getattr(p, "is_junction", lambda: False)() for p in entries):
+            raise ValueError("terminal currency package contains links")
+        actual = {p.relative_to(code_root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+                  for p in sorted(entries) if p.is_file() and "__pycache__" not in p.parts and p.suffix != ".pyc"}
+        if (source != transition.get("target_code_manifest") or not isinstance(target, dict)
+                or canonical_hash(source) != before.get("code_sha256") or canonical_hash(target) != after.get("code_sha256")
+                or actual != target or {k for k in set(source) | set(target) if source.get(k) != target.get(k)}
+                != {"runner/recovery.py", "runner/build_rule_accounting.py", "runner/known_http_reservations.py", "runner/reservation_currency_trace.py"}):
+            raise ValueError("terminal currency package binding mismatch")
+        checkpoint_path = self.path / "terminal-currency-source-checkpoint.json"
+        if _file_hash(checkpoint_path) != upgrade.get("source_checkpoint_sha256"):
+            raise ValueError("terminal currency checkpoint backup changed")
+        try:
+            checkpoint = json.loads(checkpoint_path.read_bytes())
+            digest = checkpoint.pop("sha256")
+            anchor = checkpoint["journal_anchor"]
+            if (digest != canonical_hash(checkpoint) or checkpoint.get("identity") != before or checkpoint.get("halt_required")
+                    or checkpoint.get("cursor", {}).get("unit") != "population_reports_completed"
+                    or not isinstance(anchor.get("count"), int) or not 0 < anchor["count"] <= sequence
+                    or rows[anchor["count"]-1].get("sha256") != anchor.get("head")):
+                raise ValueError("terminal currency checkpoint is not terminal")
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            raise ValueError("terminal currency checkpoint is invalid") from exc
+        for path, name in ((self.root / "metrics/provider_attempts.jsonl", "ledger"),
+                           (self.root / "metrics/budget/budget_events.jsonl", "budget_events")):
+            raw = path.read_bytes()
+            size = upgrade.get("source_"+name+"_bytes")
+            if (not isinstance(size, int) or isinstance(size, bool) or size < 0 or len(raw) < size
+                    or hashlib.sha256(raw[:size]).hexdigest() != upgrade.get("source_"+name+"_sha256")):
+                raise ValueError("terminal currency accounting prefix changed")
+        if _file_hash(self.path / "terminal-currency-source-budget.json") != upgrade.get("source_budget_sha256"):
+            raise ValueError("terminal currency budget backup changed")
+
+    def authorize_terminal_currency_accounting_upgrade(self, *, target_code_manifest: dict[str, str]) -> None:
+        """Record a terminal-only source compatibility transition without starting a game."""
+        with RecoveryLock(self.path / "writer.lock"):
+            rows = self._journal_rows()
+            transitions = [r for r in rows if r.get("kind") == "build_rule_replay_transition_v1"]
+            activations = [r for r in rows if r.get("kind") == "build_rule_activation_v1"]
+            if (len(transitions) != 1 or len(activations) != 1
+                    or any(r.get("kind") in {"known_http_accounting_upgrade_v1", "terminal_currency_accounting_upgrade_v1"} for r in rows)
+                    or self.in_flight() or (self.path / "commit_manifest.json").exists()):
+                raise ValueError("terminal currency upgrade requires one complete terminal history")
+            checkpoint = self._read_checkpoint()
+            if (not checkpoint or checkpoint.get("halt_required")
+                    or checkpoint.get("cursor", {}).get("unit") != "population_reports_completed"):
+                raise ValueError("terminal currency upgrade requires completed population reports")
+            self._validate_build_rule_replay_checkpoint(rows[checkpoint["journal_anchor"]["count"]-1], transitions[0], rows)
+            self._validate_build_rule_activation(activations[0], transitions[0], rows)
+            cp = self.path / "terminal-currency-source-checkpoint.json"
+            budget = self.path / "terminal-currency-source-budget.json"
+            if cp.exists() or budget.exists():
+                raise ValueError("terminal currency source backups already exist; review before retry")
+            _atomic_copy(self.checkpoint_path, cp)
+            _atomic_copy(self.root / "metrics/budget/budget_state.json", budget)
+            ledger = (self.root / "metrics/provider_attempts.jsonl").read_bytes()
+            events = (self.root / "metrics/budget/budget_events.jsonl").read_bytes()
+            payload = {"kind":"terminal_currency_accounting_upgrade_v1", "transition_sha256":transitions[0]["sha256"],
+                       "from_identity":transitions[0]["to_identity"], "to_identity":self.identity,
+                       "source_code_manifest":transitions[0]["target_code_manifest"], "target_code_manifest":target_code_manifest,
+                       "source_journal_count":len(rows), "source_journal_head":rows[-1]["sha256"],
+                       "source_checkpoint_sha256":_file_hash(cp), "source_budget_sha256":_file_hash(budget),
+                       "source_ledger_bytes":len(ledger), "source_ledger_sha256":hashlib.sha256(ledger).hexdigest(),
+                       "source_budget_events_bytes":len(events), "source_budget_events_sha256":hashlib.sha256(events).hexdigest()}
+            provisional = {**payload, "sequence":len(rows), "previous_hash":rows[-1]["sha256"]}
+            provisional["sha256"] = canonical_hash(provisional)
+            self._validate_terminal_currency_upgrade(transitions[0], [*rows, provisional])
+            self._append(payload)
 
     def _validate_known_http_upgrade(self, transition: dict[str, Any], rows: list[dict[str, Any]]) -> None:
         upgrades = [row for row in rows if row.get("kind") == "known_http_accounting_upgrade_v1"]
@@ -2033,7 +2121,10 @@ class ExperimentRecovery:
                 != {k: v for k, v in target.items() if k != "code_sha256"}):
             raise ValueError("build replay transition changed experiment identity or configuration")
         if target != self.identity:
-            self._validate_known_http_upgrade(receipt, rows)
+            if any(row.get("kind") == "terminal_currency_accounting_upgrade_v1" for row in rows):
+                self._validate_terminal_currency_upgrade(receipt, rows)
+            else:
+                self._validate_known_http_upgrade(receipt, rows)
         old_manifest, new_manifest = receipt.get("source_code_manifest"), receipt.get("target_code_manifest")
         if (not isinstance(old_manifest, dict) or not isinstance(new_manifest, dict)
                 or canonical_hash(old_manifest) != source.get("code_sha256")
