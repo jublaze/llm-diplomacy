@@ -1,0 +1,13 @@
+{
+  "policy_version": "diplomacy_luna_successor_postgame_release_v1",
+  "games": {
+    "g2": {
+      "report_sha256": "6d3206f3ddb5faca50246e64b1ecd82f5535ba6a9e0a711b4fd298a632cb6d60",
+      "receipt_sha256": "d6e4d9f4536349065d58a4e957e9f03b0f1f7c0abd7c8c779928abaa290ad4a5"
+    }
+  },
+  "asset_name": "luna-successor-full-postgame-v1.zip",
+  "release_tag": "luna-successor-full-postgame-v1",
+  "asset_sha256": "ad3b6d58ca2a1a156a51d63884c7fdce236a5ee6bd6ac9e5a1a3596915bd860f",
+  "asset_bytes": 809910
+}
