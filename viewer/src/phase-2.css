@@ -43,6 +43,8 @@
 }
 
 @media (max-width: 440px) {
+  .perspective-bar label { align-items: stretch; flex-direction: column; white-space: normal; }
+  .perspective-bar select { max-width: 100%; }
   .tool-actions button, .year-nav button { flex: 1 1 42%; }
   .search-results { grid-template-columns: 1fr; }
 }
