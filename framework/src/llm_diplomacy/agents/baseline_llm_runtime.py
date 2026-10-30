@@ -505,8 +505,12 @@ class BaselineLLMAgentRuntime(AgentRuntime):
             visible_state = dict(context.visible_state)
             visible_state.pop("_recovery_occurrence", None)
             context = replace(context, visible_state=visible_state)
-        built = self.context_builder.build(context)
         decision_id = "/".join((context.game_id, context.phase_id, occurrence, country, context.agent_id, method))
+        selector = (getattr(self.recovery, "build_rule_replay_selector", None)
+                    if self.recovery is not None else None)
+        selection = selector.select(decision_id) if selector is not None else None
+        built = (self.context_builder.build(context, legacy_adjustment=selection.legacy_prompt)
+                 if selection is not None else self.context_builder.build(context))
         historical_hash = self.recovery.legacy_prompt_hash(decision_id) if self.recovery is not None else None
         prose_adoption = (self.recovery.free_text_reflection_adoption(decision_id)
                           if method == "reflect" and self.recovery is not None else None)
@@ -635,7 +639,11 @@ class BaselineLLMAgentRuntime(AgentRuntime):
             budget_blocked = False
             provider_error_details: dict[str, Any] | None = None
             attempt_started = time.monotonic()
-            cached = self.recovery.cached_response(decision_id, prompt_hash) if self.recovery is not None else None
+            cached = (selector.cached_response(self.recovery, decision_id=decision_id, prompt_hash=prompt_hash)
+                      if selector is not None and selection.legacy_prompt else
+                      selector.cached_new_response(self.recovery, decision_id=decision_id, prompt_hash=prompt_hash)
+                      if selector is not None else
+                      self.recovery.cached_response(decision_id, prompt_hash) if self.recovery is not None else None)
             used_cached_response = cached is not None
             if (not repeat_invalid and correction_feedback is not None and cached is None and self.recovery is not None
                     and any(row.get("kind") in {"dispatch_prepared", "dispatch", "attempt"}
@@ -646,14 +654,19 @@ class BaselineLLMAgentRuntime(AgentRuntime):
                 raise RuntimeError("Recovery required: the one corrective request already has a durable attempt")
             if cached is not None:
                 attempt_id = str(cached.get("attempt_id", attempt_id))
+            if selection is not None and selection.legacy_prompt:
+                selection = selector.select_attempt(decision_id=decision_id, prompt_hash=prompt_hash, cached=cached)
             if self.recovery is not None and self.recovery.is_abandoned(decision_id):
                 raise RuntimeError("Recovery decision abandoned this logical request")
             if cached is None and self.recovery is not None and self.recovery.attempt_count(decision_id) >= self.recovery.attempt_limit(decision_id, prompt_hash):
                 self.recovery.halt(reason="attempt_limit_exhausted", decision_id=decision_id)
                 raise RuntimeError("Recovery required: logical decision exhausted its request limit")
-            if cached is None and self.recovery is not None and self.recovery.has_unresolved_dispatch(decision_id, prompt_hash):
-                self.recovery.halt(reason="unknown_provider_outcome", decision_id=decision_id)
-                raise RuntimeError("Recovery required: unresolved provider dispatch needs an explicit decision")
+            if cached is None and self.recovery is not None:
+                try:
+                    self.recovery.assert_dispatch_allowed(decision_id=decision_id, prompt_hash=prompt_hash)
+                except RuntimeError:
+                    self.recovery.halt(reason="unknown_provider_outcome", decision_id=decision_id)
+                    raise
             dispatched = False
             if cached is not None:
                 row = cached.get("response") or {}
@@ -793,11 +806,14 @@ class BaselineLLMAgentRuntime(AgentRuntime):
                     fresh_reflection_issue = self._reflection_semantic_issue(
                         payload=normalized_reflection, context=context)
                 parsed = normalized_reflection
+            validation_context = (self.context_builder.build(context)
+                                  if selection is not None and selection.amended_boundary_validation else built)
             valid, issue = self._validate_payload(
                 method=method,
                 payload=parsed,
                 context=context,
-                built_context=built,
+                built_context=validation_context,
+                legacy_adjustment=selection.legacy_validation if selection is not None else False,
             )
             order_validation_issue = None
             empty_required_movement = (
@@ -815,6 +831,8 @@ class BaselineLLMAgentRuntime(AgentRuntime):
                 and (issue == "adjustment requires empty orders when no build/disband is required"
                      or issue.startswith("adjustment requires exactly ")
                      and issue.endswith((" BUILD orders", " DISBAND orders"))
+                     or issue.startswith("adjustment permits at most ")
+                     or issue.startswith("duplicate adjustment ")
                      or issue in {"adjustment requires BUILD orders only",
                                   "adjustment requires DISBAND orders only"}
                      or issue in {"illegal adjustment order payload for BUILD",
@@ -886,10 +904,28 @@ class BaselineLLMAgentRuntime(AgentRuntime):
                 }
             )
             if self.recovery is not None and provider_error is None:
-                self.recovery.record_validation(
-                    decision_id=decision_id, prompt_hash=prompt_hash, attempt_id=attempt_id,
-                    valid=bool(valid), issue=issue if not valid else None,
-                )
+                if selection is not None and selection.boundary:
+                    from llm_diplomacy.runner.recovery import canonical_hash
+                    selector.cross_boundary(selection=selection, decision_id=decision_id, cached=cached,
+                        context_sha256=canonical_hash(context.visible_state),
+                        response_hash=canonical_hash(cached.get("response")), valid=bool(valid))
+                    self.recovery.record_build_rule_boundary_validation()
+                elif selection is not None and selection.legacy_prompt:
+                    prior = [row for row in self.recovery._journal_rows()
+                             if row.get("kind") == "response_validation"
+                             and row.get("decision_id") == decision_id
+                             and row.get("prompt_hash") == prompt_hash
+                             and row.get("attempt_id") == attempt_id]
+                    if not prior or not any(row.get("valid") is bool(valid)
+                                            and row.get("issue") == (issue if not valid else None)
+                                            for row in prior):
+                        raise ValueError("historical validation differs from saved journal")
+                    selector.advance_historical(decision_id=decision_id, selection=selection)
+                if selection is None or not selection.boundary:
+                    self.recovery.record_validation(
+                        decision_id=decision_id, prompt_hash=prompt_hash, attempt_id=attempt_id,
+                        valid=bool(valid), issue=issue if not valid else None,
+                    )
             if repeat_invalid and provider_error is None and not budget_blocked and not valid:
                 parser_error = None
                 if parsed is None:
@@ -1175,6 +1211,7 @@ class BaselineLLMAgentRuntime(AgentRuntime):
         payload: dict[str, Any] | None,
         context: AgentContext | None = None,
         built_context: dict[str, Any] | None = None,
+        legacy_adjustment: bool = False,
     ) -> tuple[bool, str]:
         if method == "reflect" and isinstance(payload, dict) and isinstance(payload.get("reflection_text"), str):
             return True, ""
@@ -1279,6 +1316,7 @@ class BaselineLLMAgentRuntime(AgentRuntime):
                 context=context,
                 built_context=built_context,
                 orders=orders,
+                legacy_adjustment=legacy_adjustment,
             )
             if legal_issue is not None:
                 return False, legal_issue
@@ -2062,6 +2100,7 @@ class BaselineLLMAgentRuntime(AgentRuntime):
         context: AgentContext | None,
         built_context: dict[str, Any] | None,
         orders: list[dict[str, Any]],
+        legacy_adjustment: bool = False,
     ) -> str | None:
         if context is None or built_context is None:
             return None
@@ -2086,8 +2125,15 @@ class BaselineLLMAgentRuntime(AgentRuntime):
                     return "adjustment requires empty orders when no build/disband is required"
                 return None
             expected_type = "BUILD" if obligation == "build" else "DISBAND"
-            if required_count > 0 and len(orders) != required_count:
+            if obligation == "build" and not legacy_adjustment:
+                sites = {row.get("payload", {}).get("province") for row in legal_options
+                         if isinstance(row, dict) and isinstance(row.get("payload"), dict)}
+                maximum = min(int(adjustment.get("delta", 0)), len(sites))
+                if len(orders) > maximum:
+                    return f"adjustment permits at most {maximum} BUILD orders"
+            elif required_count > 0 and len(orders) != required_count:
                 return f"adjustment requires exactly {required_count} {expected_type} orders"
+            seen = set()
             for row in orders:
                 if not isinstance(row, dict):
                     return "adjustment order entry must be object"
@@ -2097,6 +2143,11 @@ class BaselineLLMAgentRuntime(AgentRuntime):
                 signature = self._order_signature(row_type, row.get("payload", {}))
                 if signature not in legal_signatures:
                     return f"illegal adjustment order payload for {row_type}"
+                payload = row.get("payload", {})
+                identity = payload.get("province") if obligation == "build" else payload.get("unit_ref")
+                if not legacy_adjustment and identity in seen:
+                    return f"duplicate adjustment {'province' if obligation == 'build' else 'unit_ref'}: {identity}"
+                seen.add(identity)
             return None
 
         signatures_by_unit = legal.get("legal_order_signatures_by_unit", {})

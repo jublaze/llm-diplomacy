@@ -56,7 +56,7 @@ class PromptContextBuilder:
         self.coast_by_id = {coast.id: coast for coast in self.map_def.coasts}
         self.convoy_passable_seas = set(self.map_def.convoy_passable_seas)
 
-    def build(self, context: AgentContext) -> dict[str, Any]:
+    def build(self, context: AgentContext, *, legacy_adjustment: bool = False) -> dict[str, Any]:
         visible_state = dict(context.visible_state)
         context_warnings: list[str] = []
         private_messages = [
@@ -170,7 +170,8 @@ class PromptContextBuilder:
             warning_key="soul_truncated",
             warnings=context_warnings,
         )
-        legal_order_context = self._legal_order_context(state=visible_state, country=context.country_assignment)
+        legal_order_context = self._legal_order_context(state=visible_state, country=context.country_assignment,
+                                                        legacy_adjustment=legacy_adjustment)
         return {
             "schema_version": context.schema_version,
             "agent_id": context.agent_id,
@@ -922,7 +923,8 @@ class PromptContextBuilder:
             "summary": "Public adjudication outcomes and final orders are available after resolution; current-phase orders remain secret before adjudication.",
         }
 
-    def _legal_order_context(self, *, state: dict[str, Any], country: str | None) -> dict[str, Any]:
+    def _legal_order_context(self, *, state: dict[str, Any], country: str | None,
+                             legacy_adjustment: bool = False) -> dict[str, Any]:
         phase = str(state.get("phase", "movement"))
         country_value = str(country or "")
         own_units = [
@@ -967,7 +969,7 @@ class PromptContextBuilder:
                 }
             )
 
-        adjustment = self._adjustment_context(state=state, country=country_value)
+        adjustment = self._adjustment_context(state=state, country=country_value, legacy=legacy_adjustment)
         legal_context = {
             "phase": phase,
             "phase_legal_order_types": types,
@@ -1224,7 +1226,8 @@ class PromptContextBuilder:
             key=lambda row: (str(row.get("province", "")), str(row.get("unit_id", ""))),
         )
 
-    def _adjustment_context(self, *, state: dict[str, Any], country: str) -> dict[str, Any]:
+    def _adjustment_context(self, *, state: dict[str, Any], country: str,
+                            legacy: bool = False) -> dict[str, Any]:
         if str(state.get("phase", "")) != "adjustment" or not country:
             return {"obligation": "not_adjustment", "delta": 0, "required_count": 0, "legal_options": []}
 
@@ -1256,7 +1259,11 @@ class PromptContextBuilder:
                 "legal_options": options,
             }
 
-        occupied = {str(row.get("province", "")) for row in active_units}
+        occupied = {str(row.get("province", "")) for row in active_units} if legacy else {
+            str(row.get("province", ""))
+            for row in state.get("units", [])
+            if isinstance(row, dict) and str(row.get("status", "active")) == "active"
+        }
         home_centers = sorted(
             [
                 province.id
@@ -1290,7 +1297,11 @@ class PromptContextBuilder:
                     options.append(
                         {"type": "BUILD", "payload": {"unit_type": "F", "province": province_id, "coast": None}}
                     )
-        return {"obligation": "build", "delta": delta, "required_count": delta, "legal_options": options}
+        if legacy:
+            return {"obligation": "build", "delta": delta, "required_count": delta, "legal_options": options}
+        sites = {row["payload"]["province"] for row in options}
+        return {"obligation": "build", "delta": delta, "required_count": 0,
+                "minimum_count": 0, "maximum_count": min(delta, len(sites)), "legal_options": options}
 
     def _legal_move_destinations(self, *, unit_type: str, province: str, coast: str | None) -> list[str]:
         if province not in self.province_by_id:

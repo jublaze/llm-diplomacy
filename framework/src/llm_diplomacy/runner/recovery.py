@@ -15,6 +15,14 @@ from typing import Any
 RECOVERY_VERSION = 1
 _RUSSIA_ADJUSTMENT_DECISION = "game_001/1903_winter_adjustment/once/russia/birsan_ii/submit_orders"
 JOURNAL_KINDS = {
+    "provider_import_intent_v1", "provider_import_settlement_v1",
+    "terminal_currency_accounting_upgrade_v1",
+    "known_http_accounting_upgrade_v1", "timeout_accounting_upgrade_v1",
+    "build_rule_replay_transition_v1",
+    "build_rule_replay_checkpoint_v1",
+    "build_rule_boundary_adoption_v1",
+    "build_rule_activation_v1",
+    "build_rule_boundary_validation_v1",
     "repeat_correction_intent",
     "created", "resume_session", "commit_completed", "attempt", "dispatch", "dispatch_prepared",
     "response_validation", "response_skipped", "unknown_resolved", "operation_prepared",
@@ -349,9 +357,13 @@ class ExperimentRecovery:
         return manifest
 
     def prepare(self) -> dict[str, Any] | None:
+        self.build_rule_replay_selector = None
+        build_selector = None
         rows = self._journal_rows()
         self._validate_journal_semantics(rows)
         checkpoint = self._read_checkpoint()
+        build_transition = next((row for row in rows
+                                 if row.get("kind") == "build_rule_replay_transition_v1"), None)
         has_history = self.checkpoint_path.exists() or self.journal_path.exists()
         retreat_approval = next((row for row in rows
                                  if row.get("kind") == "retreat_missing_order_upgrade"), None)
@@ -366,6 +378,24 @@ class ExperimentRecovery:
         adjustment_upgrade = next((row for row in rows
                                    if row.get("kind") == "adjustment_order_correction_code_upgrade"), None)
         budget_upgrade = next((row for row in rows if row.get("kind") == "input_budget_upgrade"), None)
+        if build_transition is not None:
+            if any(item is not None for item in (retreat_approval, correction_upgrade, reflection_upgrade,
+                                                  negotiation_upgrade, prose_migration, adjustment_upgrade, budget_upgrade)):
+                raise ValueError("build replay transition cannot yet chain historical source upgrades")
+            from .build_rule_replay_selector import BuildRuleReplaySelector
+            history: dict[str, list[tuple[str, str]]] = {}
+            for row in rows[:build_transition["sequence"]]:
+                if row.get("kind") == "attempt" and row.get("outcome") == "received":
+                    history.setdefault(row["decision_id"], []).append((row["attempt_id"], row["prompt_hash"]))
+            boundary = build_transition["boundary"]
+            activation = next((row for row in rows if row.get("kind") == "build_rule_activation_v1"), None)
+            adoption = next((row for row in rows if row.get("kind") == "build_rule_boundary_adoption_v1"), None)
+            build_selector = BuildRuleReplaySelector(
+                historical_attempts={key: tuple(value) for key, value in history.items()},
+                boundary_decision=boundary["decision_id"], boundary_attempt=boundary["attempt_id"],
+                boundary_prompt=boundary["prompt_hash"], amend_boundary=boundary["amend"],
+                activation_sequence=activation["sequence"] if activation else None,
+                adoption_proof=adoption["proof"] if activation and adoption else None)
         if budget_upgrade is not None:
             self._validate_input_budget_upgrade(budget_upgrade, checkpoint)
         elif adjustment_upgrade is not None:
@@ -391,7 +421,7 @@ class ExperimentRecovery:
                     raise ValueError("resume requires a valid recovery checkpoint")
                 checkpoint = None
                 self.needs_bootstrap = True
-            elif checkpoint.get("identity") != self.identity:
+            elif checkpoint.get("identity") != self.identity and build_transition is None:
                 if budget_upgrade is not None:
                     self._validate_input_budget_upgrade(budget_upgrade, checkpoint)
                 elif adjustment_upgrade is not None:
@@ -431,9 +461,28 @@ class ExperimentRecovery:
                 self.needs_bootstrap = True
             if not (self.path / "initial_snapshot").exists() and not self.attempt_count_total():
                 self.needs_bootstrap = True
+            anchor = (checkpoint.get("journal_anchor") or {}).get("count")
+            if (build_transition is not None and isinstance(anchor, int) and 0 < anchor <= len(rows)
+                    and checkpoint.get("cursor", {}).get("unit") in {"game_completed", "population_reports_completed"}
+                    and not (self.path / "commit_manifest.json").exists()):
+                terminal = rows[anchor - 1]
+                manifest = terminal.get("terminal_manifest") if terminal.get("kind") == "build_rule_replay_checkpoint_v1" else None
+                if (isinstance(manifest, dict) and not any(row.get("kind") == "commit_completed"
+                        and row.get("transaction_id") == manifest.get("transaction_id")
+                        and row.get("sequence", -1) > terminal.get("sequence", -1) for row in rows)):
+                    self._validate_build_rule_replay_checkpoint(terminal, build_transition, rows)
+                    self._append({"kind": "commit_completed", "transaction_id": manifest["transaction_id"]})
+                    rows = self._journal_rows()
             if rows:
                 atomic_json(self.journal_head_path,
                             {"sequence": len(rows) - 1, "sha256": rows[-1]["sha256"]})
+            if (build_selector is not None and activation is not None and
+                    (checkpoint.get("cursor", {}).get("unit") in {"game_completed", "population_reports_completed"}
+                     or ((self.path / "commit_manifest.json").exists() and any(
+                         row.get("kind") == "build_rule_boundary_validation_v1"
+                         and row.get("sequence", -1) > activation["sequence"] for row in rows)))):
+                build_selector._boundary_crossed = True
+            self.build_rule_replay_selector = build_selector
             return checkpoint
         if has_history:
             raise FileExistsError("experiment recovery evidence exists; use explicit resume")
@@ -445,6 +494,24 @@ class ExperimentRecovery:
 
     def checkpoint(self, *, cursor: dict[str, Any], state: dict[str, Any], applied: list[str]) -> None:
         rows = self._journal_rows()
+        if getattr(self, "build_rule_replay_selector", None) is not None:
+            transitions = [row for row in rows if row.get("kind") == "build_rule_replay_transition_v1"]
+            if len(transitions) != 1:
+                raise ValueError("replay checkpoint lacks its unique transition")
+            payload = {"kind": "build_rule_replay_checkpoint_v1", "transition_sha256": transitions[0]["sha256"],
+                       "identity": self.identity, "cursor": cursor, "state": state, "applied": applied}
+            if cursor.get("unit") in {"game_completed", "population_reports_completed"}:
+                if not getattr(self.build_rule_replay_selector, "_boundary_crossed", False):
+                    raise ValueError("terminal checkpoint requires the adopted boundary to be crossed")
+                manifest = self.validate_pending_commit(canonical_root=self.root)
+                if manifest is None:
+                    raise ValueError("terminal checkpoint requires a durable commit manifest")
+                payload["terminal_manifest"] = manifest
+            provisional = {**payload, "sequence": len(rows), "previous_hash": rows[-1]["sha256"]}
+            provisional["sha256"] = canonical_hash(provisional)
+            self._validate_build_rule_replay_checkpoint(provisional, transitions[0], rows)
+            self._append(payload)
+            rows = self._journal_rows()
         head = rows[-1].get("sha256") if rows else None
         body = {
             "version": RECOVERY_VERSION,
@@ -497,10 +564,18 @@ class ExperimentRecovery:
             return None
         manifest = self.validate_pending_commit(canonical_root=canonical_root)
         manifest.pop("sha256", None)
+        if any(row.get("kind") == "commit_completed" and row.get("transaction_id") == manifest["transaction_id"]
+               for row in self._journal_rows()):
+            checkpoint = self._read_checkpoint()
+            if (checkpoint is None or any(checkpoint.get(k) != manifest[k] for k in ("cursor", "state", "applied"))
+                    or any(_file_hash(canonical_root / Path(row["path"])) != row["after"] for row in manifest["entries"])):
+                raise ValueError("completed transaction differs from its checkpoint or files")
+            manifest_path.unlink()
+            return manifest
         self._apply_commit(manifest, canonical_root=canonical_root)
         self.checkpoint(cursor=manifest["cursor"], state=manifest["state"], applied=manifest["applied"])
-        manifest_path.unlink()
         self._append({"kind": "commit_completed", "transaction_id": manifest["transaction_id"]})
+        manifest_path.unlink()
         return manifest
 
     def validate_pending_commit(self, *, canonical_root: Path) -> dict[str, Any]:
@@ -1794,12 +1869,797 @@ class ExperimentRecovery:
             raise ValueError("approved historical response is unavailable; refusing another request")
         return prompt_hash
 
+    def _validate_build_rule_replay_checkpoint(self, entry: dict[str, Any], receipt: dict[str, Any],
+                                               rows: list[dict[str, Any]]) -> None:
+        upgrades = [row for row in rows if row.get("kind") in {"known_http_accounting_upgrade_v1", "terminal_currency_accounting_upgrade_v1", "timeout_accounting_upgrade_v1"}
+                    and row.get("sequence", -1) < entry.get("sequence", -1)]
+        expected_identity = upgrades[-1]["to_identity"] if upgrades else receipt.get("to_identity")
+        if (entry.get("transition_sha256") != receipt.get("sha256")
+                or entry.get("identity") != expected_identity
+                or not isinstance(entry.get("state"), dict) or not isinstance(entry.get("applied"), list)):
+            raise ValueError("build replay checkpoint receipt is invalid")
+        cursor = entry.get("cursor")
+        original_cursor = receipt["source_checkpoint"].get("cursor", {})
+        if isinstance(cursor, dict) and cursor.get("unit") in {"game_completed", "population_reports_completed"}:
+            activation = next((row for row in rows if row.get("kind") == "build_rule_activation_v1"
+                               and row.get("sequence", -1) < entry.get("sequence", -1)), None)
+            boundary_validated = any(row.get("kind") == "build_rule_boundary_validation_v1"
+                                     and activation is not None
+                                     and activation["sequence"] < row.get("sequence", -1) < entry.get("sequence", -1)
+                                     for row in rows)
+            manifest = entry.get("terminal_manifest")
+            if (activation is None or not boundary_validated or cursor.get("game_index") != 1 or not isinstance(manifest, dict)
+                    or manifest.get("sha256") != canonical_hash({k: v for k, v in manifest.items() if k != "sha256"})
+                    or manifest.get("cursor") != cursor or manifest.get("state") != entry.get("state")
+                    or manifest.get("applied") != entry.get("applied")
+                    or Path(manifest.get("canonical_root", "")).resolve() != self.root.resolve()):
+                raise ValueError("terminal replay checkpoint lacks an exact commit manifest")
+            pending = self.path / "commit_manifest.json"
+            completed = any(row.get("kind") == "commit_completed"
+                            and row.get("transaction_id") == manifest.get("transaction_id")
+                            and row.get("sequence", -1) > entry.get("sequence", -1) for row in rows)
+            if not completed:
+                try:
+                    if json.loads(pending.read_bytes()) != manifest:
+                        raise ValueError("terminal replay checkpoint commit manifest differs")
+                except FileNotFoundError:
+                    entries = manifest.get("entries")
+                    if not isinstance(entries, list):
+                        raise ValueError("terminal commit evidence has invalid entries")
+                    seen = set()
+                    for item in entries:
+                        name = item.get("path") if isinstance(item, dict) else None
+                        path = Path(name) if isinstance(name, str) else None
+                        if (path is None or path.is_absolute() or ".." in path.parts or name in seen
+                                or item.get("delete") is not False or not isinstance(item.get("after"), str)
+                                or _file_hash(self.root / path) != item["after"]):
+                            raise ValueError("terminal commit evidence does not match canonical files")
+                        seen.add(name)
+                except (OSError, json.JSONDecodeError) as exc:
+                    raise ValueError("terminal replay checkpoint lacks pending or completed commit") from exc
+            return
+        if not isinstance(cursor, dict) or cursor.get("game_id") != original_cursor.get("game_id"):
+            raise ValueError("build replay checkpoint belongs to another game")
+        phases = {original_cursor.get("phase_id")}
+        for row in rows[:receipt["sequence"]]:
+            decision = row.get("decision_id")
+            if isinstance(decision, str):
+                parts = decision.split("/")
+                if len(parts) == 6 and parts[0] == original_cursor.get("game_id"):
+                    phase = parts[1]
+                    phases.add(phase)
+                    if phase.endswith("_negotiation"):
+                        suffix = "_adjustment" if phase.endswith("_winter_negotiation") else "_movement"
+                        phases.add(phase[:-len("_negotiation")] + suffix)
+        if cursor.get("phase_id") not in phases:
+            activation = next((row for row in rows if row.get("kind") == "build_rule_activation_v1"
+                               and row.get("sequence", -1) < entry.get("sequence", -1)), None)
+            def order(value: Any) -> tuple[int, int] | None:
+                parts = value.split("_") if isinstance(value, str) else []
+                seasons = {"spring": 0, "fall": 1, "winter": 2}
+                if len(parts) < 3 or not parts[0].isdigit() or parts[1] not in seasons:
+                    return None
+                return int(parts[0]), seasons[parts[1]]
+            before = order(original_cursor.get("phase_id"))
+            after = order(cursor.get("phase_id"))
+            if activation is None or before is None or after is None or after < before:
+                raise ValueError("build replay checkpoint is outside historical phases")
+        if cursor.get("unit") not in {"phase_started", "phase_completed"}:
+            raise ValueError("build replay checkpoint is outside historical phases")
+
+    def _validate_terminal_currency_upgrade(self, transition: dict[str, Any], rows: list[dict[str, Any]]) -> None:
+        upgrades = [row for row in rows if row.get("kind") == "terminal_currency_accounting_upgrade_v1"]
+        if len(upgrades) != 1:
+            raise ValueError("terminal currency upgrade is missing or duplicated")
+        upgrade = upgrades[0]
+        sequence = upgrade.get("sequence")
+        before, after = upgrade.get("from_identity"), upgrade.get("to_identity")
+        if (not isinstance(sequence, int) or isinstance(sequence, bool) or not 0 < sequence < len(rows)
+                or upgrade.get("source_journal_count") != sequence or upgrade.get("source_journal_head") != rows[sequence-1].get("sha256")
+                or upgrade.get("previous_hash") != upgrade.get("source_journal_head")
+                or upgrade.get("transition_sha256") != transition.get("sha256")
+                or before != transition.get("to_identity") or after != self.identity
+                or {k:v for k,v in before.items() if k != "code_sha256"}
+                != {k:v for k,v in after.items() if k != "code_sha256"}):
+            raise ValueError("terminal currency identity or journal binding mismatch")
+        source, target = upgrade.get("source_code_manifest"), upgrade.get("target_code_manifest")
+        code_root = Path(__file__).parents[1]
+        entries = list(code_root.rglob("*"))
+        if any(p.is_symlink() or getattr(p, "is_junction", lambda: False)() for p in entries):
+            raise ValueError("terminal currency package contains links")
+        actual = {p.relative_to(code_root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+                  for p in sorted(entries) if p.is_file() and "__pycache__" not in p.parts and p.suffix != ".pyc"}
+        if (source != transition.get("target_code_manifest") or not isinstance(target, dict)
+                or canonical_hash(source) != before.get("code_sha256") or canonical_hash(target) != after.get("code_sha256")
+                or actual != target or {k for k in set(source) | set(target) if source.get(k) != target.get(k)}
+                != {"runner/recovery.py", "runner/build_rule_accounting.py", "runner/known_http_reservations.py", "runner/reservation_currency_trace.py"}):
+            raise ValueError("terminal currency package binding mismatch")
+        checkpoint_path = self.path / "terminal-currency-source-checkpoint.json"
+        if _file_hash(checkpoint_path) != upgrade.get("source_checkpoint_sha256"):
+            raise ValueError("terminal currency checkpoint backup changed")
+        try:
+            checkpoint = json.loads(checkpoint_path.read_bytes())
+            digest = checkpoint.pop("sha256")
+            anchor = checkpoint["journal_anchor"]
+            if (digest != canonical_hash(checkpoint) or checkpoint.get("identity") != before or checkpoint.get("halt_required")
+                    or checkpoint.get("cursor", {}).get("unit") != "population_reports_completed"
+                    or not isinstance(anchor.get("count"), int) or not 0 < anchor["count"] <= sequence
+                    or rows[anchor["count"]-1].get("sha256") != anchor.get("head")):
+                raise ValueError("terminal currency checkpoint is not terminal")
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            raise ValueError("terminal currency checkpoint is invalid") from exc
+        for path, name in ((self.root / "metrics/provider_attempts.jsonl", "ledger"),
+                           (self.root / "metrics/budget/budget_events.jsonl", "budget_events")):
+            raw = path.read_bytes()
+            size = upgrade.get("source_"+name+"_bytes")
+            if (not isinstance(size, int) or isinstance(size, bool) or size < 0 or len(raw) < size
+                    or hashlib.sha256(raw[:size]).hexdigest() != upgrade.get("source_"+name+"_sha256")):
+                raise ValueError("terminal currency accounting prefix changed")
+        if _file_hash(self.path / "terminal-currency-source-budget.json") != upgrade.get("source_budget_sha256"):
+            raise ValueError("terminal currency budget backup changed")
+
+    def authorize_terminal_currency_accounting_upgrade(self, *, target_code_manifest: dict[str, str]) -> None:
+        """Record a terminal-only source compatibility transition without starting a game."""
+        with RecoveryLock(self.path / "writer.lock"):
+            rows = self._journal_rows()
+            transitions = [r for r in rows if r.get("kind") == "build_rule_replay_transition_v1"]
+            activations = [r for r in rows if r.get("kind") == "build_rule_activation_v1"]
+            if (len(transitions) != 1 or len(activations) != 1
+                    or any(r.get("kind") in {"known_http_accounting_upgrade_v1", "terminal_currency_accounting_upgrade_v1"} for r in rows)
+                    or self.in_flight() or (self.path / "commit_manifest.json").exists()):
+                raise ValueError("terminal currency upgrade requires one complete terminal history")
+            checkpoint = self._read_checkpoint()
+            if (not checkpoint or checkpoint.get("halt_required")
+                    or checkpoint.get("cursor", {}).get("unit") != "population_reports_completed"):
+                raise ValueError("terminal currency upgrade requires completed population reports")
+            self._validate_build_rule_replay_checkpoint(rows[checkpoint["journal_anchor"]["count"]-1], transitions[0], rows)
+            self._validate_build_rule_activation(activations[0], transitions[0], rows)
+            cp = self.path / "terminal-currency-source-checkpoint.json"
+            budget = self.path / "terminal-currency-source-budget.json"
+            if cp.exists() or budget.exists():
+                raise ValueError("terminal currency source backups already exist; review before retry")
+            _atomic_copy(self.checkpoint_path, cp)
+            _atomic_copy(self.root / "metrics/budget/budget_state.json", budget)
+            ledger = (self.root / "metrics/provider_attempts.jsonl").read_bytes()
+            events = (self.root / "metrics/budget/budget_events.jsonl").read_bytes()
+            payload = {"kind":"terminal_currency_accounting_upgrade_v1", "transition_sha256":transitions[0]["sha256"],
+                       "from_identity":transitions[0]["to_identity"], "to_identity":self.identity,
+                       "source_code_manifest":transitions[0]["target_code_manifest"], "target_code_manifest":target_code_manifest,
+                       "source_journal_count":len(rows), "source_journal_head":rows[-1]["sha256"],
+                       "source_checkpoint_sha256":_file_hash(cp), "source_budget_sha256":_file_hash(budget),
+                       "source_ledger_bytes":len(ledger), "source_ledger_sha256":hashlib.sha256(ledger).hexdigest(),
+                       "source_budget_events_bytes":len(events), "source_budget_events_sha256":hashlib.sha256(events).hexdigest()}
+            provisional = {**payload, "sequence":len(rows), "previous_hash":rows[-1]["sha256"]}
+            provisional["sha256"] = canonical_hash(provisional)
+            self._validate_terminal_currency_upgrade(transitions[0], [*rows, provisional])
+            self._append(payload)
+
+    def _validate_known_http_upgrade(self, transition: dict[str, Any], rows: list[dict[str, Any]]) -> None:
+        upgrades = [row for row in rows if row.get("kind") == "known_http_accounting_upgrade_v1"]
+        if len(upgrades) != 1:
+            raise ValueError("known HTTP accounting upgrade is missing or duplicated")
+        upgrade = upgrades[0]
+        sequence = upgrade.get("sequence")
+        before, after = upgrade.get("from_identity"), upgrade.get("to_identity")
+        if (not isinstance(sequence, int) or isinstance(sequence, bool) or sequence < 1
+                or sequence >= len(rows) or upgrade.get("source_journal_count") != sequence
+                or upgrade.get("source_journal_head") != rows[sequence - 1].get("sha256")
+                or upgrade.get("previous_hash") != upgrade.get("source_journal_head")
+                or upgrade.get("transition_sha256") != transition.get("sha256")
+                or before != transition.get("to_identity")
+                or {k: v for k, v in before.items() if k != "code_sha256"}
+                != {k: v for k, v in after.items() if k != "code_sha256"}):
+            raise ValueError("known HTTP upgrade identity or journal binding mismatch")
+        source, target = upgrade.get("source_code_manifest"), upgrade.get("target_code_manifest")
+        code_root = Path(__file__).parents[1]
+        actual = {p.relative_to(code_root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+                  for p in sorted(code_root.rglob("*")) if p.is_file() and not p.is_symlink()
+                  and "__pycache__" not in p.parts and p.suffix != ".pyc"}
+        if (source != transition.get("target_code_manifest") or not isinstance(target, dict)
+                or canonical_hash(source) != before.get("code_sha256")
+                or canonical_hash(target) != after.get("code_sha256")
+                or {key for key in set(source) | set(target) if source.get(key) != target.get(key)}
+                != {"runner/recovery.py", "runner/build_rule_accounting.py", "runner/known_http_reservations.py"}):
+            raise ValueError("known HTTP upgrade package binding mismatch")
+        if any(row.get("kind") == "timeout_accounting_upgrade_v1" for row in rows):
+            self._validate_timeout_accounting_upgrade(upgrade, rows, actual)
+        elif after != self.identity or actual != target:
+            raise ValueError("known HTTP upgrade package binding mismatch")
+        failure = upgrade.get("failure")
+        attempts = [row for row in rows[:sequence] if row.get("kind") == "attempt"
+                    and row.get("attempt_id") == (failure or {}).get("attempt_id")]
+        if (len(attempts) != 1 or attempts[0] != failure or failure.get("outcome") != "known_failed"
+                or failure.get("error_category") != "provider_transient_http"
+                or failure.get("response") is not None or failure.get("usage") is not None
+                or not any(row.get("kind") == "halt" and row.get("reason") == "provider_transient_http"
+                           and row.get("decision_id") == failure.get("decision_id")
+                           and failure["sequence"] < row.get("sequence", -1) < sequence for row in rows)):
+            raise ValueError("known HTTP upgrade lacks an exact halted HTTP failure")
+        checkpoint_backup = self.path / "known-http-source-checkpoint.json"
+        if _file_hash(checkpoint_backup) != upgrade.get("source_checkpoint_sha256"):
+            raise ValueError("known HTTP source checkpoint backup changed")
+        try:
+            source_checkpoint = json.loads(checkpoint_backup.read_bytes())
+            digest = source_checkpoint.pop("sha256")
+            anchor = source_checkpoint["journal_anchor"]
+            if (digest != canonical_hash(source_checkpoint) or source_checkpoint.get("identity") != before
+                    or not source_checkpoint.get("halt_required")
+                    or source_checkpoint.get("halt_reason") != "provider_transient_http"
+                    or source_checkpoint.get("decision_id") != failure.get("decision_id")
+                    or not isinstance(anchor.get("count"), int) or not 0 < anchor["count"] <= sequence
+                    or rows[anchor["count"] - 1].get("sha256") != anchor.get("head")):
+                raise ValueError("known HTTP source checkpoint is not the halted failure")
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            raise ValueError("known HTTP source checkpoint is invalid") from exc
+        for path, prefix in ((self.root / "metrics/provider_attempts.jsonl", "ledger"),
+                             (self.root / "metrics/budget/budget_events.jsonl", "budget_events")):
+            raw = path.read_bytes()
+            length = upgrade.get("source_" + prefix + "_bytes")
+            if (not isinstance(length, int) or isinstance(length, bool) or length < 0 or len(raw) < length
+                    or hashlib.sha256(raw[:length]).hexdigest() != upgrade.get("source_" + prefix + "_sha256")):
+                raise ValueError("known HTTP accounting prefix changed")
+        if _file_hash(self.path / "known-http-source-budget.json") != upgrade.get("source_budget_sha256"):
+            raise ValueError("known HTTP source budget backup changed")
+
+    def _validate_timeout_accounting_upgrade(self, predecessor: dict[str, Any], rows: list[dict[str, Any]],
+                                             actual: dict[str, str]) -> None:
+        upgrades = [r for r in rows if r.get("kind") == "timeout_accounting_upgrade_v1"]
+        if len(upgrades) != 1:
+            raise ValueError("timeout upgrade missing or duplicated")
+        upgrade = upgrades[0]
+        sequence = upgrade.get("sequence")
+        before, after = upgrade.get("from_identity"), upgrade.get("to_identity")
+        source, target = upgrade.get("source_code_manifest"), upgrade.get("target_code_manifest")
+        if (not isinstance(sequence, int) or isinstance(sequence, bool) or not 0 < sequence < len(rows)
+                or not isinstance(predecessor.get("sequence"), int) or predecessor["sequence"] >= sequence
+                or upgrade.get("previous_hash") != rows[sequence - 1].get("sha256")
+                or upgrade.get("source_journal_count") != sequence
+                or upgrade.get("source_journal_head") != rows[sequence - 1].get("sha256")
+                or upgrade.get("http_upgrade_sha256") != predecessor.get("sha256")
+                or before != predecessor.get("to_identity") or after != self.identity
+                or {k: v for k, v in before.items() if k != "code_sha256"} != {k: v for k, v in after.items() if k != "code_sha256"}
+                or source != predecessor.get("target_code_manifest") or canonical_hash(source) != before.get("code_sha256")
+                or canonical_hash(target) != after.get("code_sha256") or actual != target
+                or not {k for k in set(source) | set(target) if source.get(k) != target.get(k)}
+                       <= {"runner/recovery.py", "runner/build_rule_accounting.py", "agents/baseline_llm_runtime.py", "population/runner.py", "runner/reservation_currency_trace.py"}):
+            raise ValueError("timeout upgrade identity or package mismatch")
+        failure = upgrade.get("failure", {})
+        originals = [r for r in rows[:sequence] if r.get("kind") == "attempt" and r.get("attempt_id") == failure.get("attempt_id")]
+        if (len(originals) != 1 or originals[0] != failure or failure.get("outcome") != "unknown"
+                or failure.get("error_category") != "provider_timeout" or failure.get("response") is not None
+                or failure.get("usage") is not None or any(r.get("kind") == "unknown_resolved"
+                    and r.get("attempt_id") == failure.get("attempt_id") for r in rows[:sequence])):
+            raise ValueError("timeout upgrade lacks exact unresolved timeout")
+        checkpoint = self.path / "timeout-source-checkpoint.json"
+        if _file_hash(checkpoint) != upgrade.get("source_checkpoint_sha256"):
+            raise ValueError("timeout source checkpoint changed")
+        cp = json.loads(checkpoint.read_bytes())
+        cp_hash = cp.pop("sha256")
+        anchor = cp.get("journal_anchor") or {}
+        count = anchor.get("count")
+        if (canonical_hash(cp) != cp_hash or cp.get("identity") != before or not cp.get("halt_required")
+                or cp.get("halt_reason") != "provider_timeout" or cp.get("decision_id") != failure.get("decision_id")
+                or not isinstance(count, int) or isinstance(count, bool) or not failure["sequence"] < count <= sequence
+                or rows[count - 1].get("sha256") != anchor.get("head")
+                or not any(r.get("kind") == "halt" and r.get("reason") == "provider_timeout"
+                           and r.get("decision_id") == failure.get("decision_id")
+                           and failure["sequence"] < r.get("sequence", -1) < sequence for r in rows)):
+            raise ValueError("timeout checkpoint mismatch")
+        if _file_hash(self.path / "timeout-source-budget.json") != upgrade.get("source_budget_sha256"):
+            raise ValueError("timeout source budget changed")
+        old_budget = json.loads((self.path / "timeout-source-budget.json").read_bytes())
+        current_budget = json.loads((self.root / "metrics/budget/budget_state.json").read_bytes())
+        original_reserves = old_budget.get("pending_reservations")
+        if (not isinstance(original_reserves, dict) or not isinstance(current_budget.get("pending_reservations"), dict)
+                or any(current_budget["pending_reservations"].get(k) != v for k, v in original_reserves.items())):
+            raise ValueError("timeout source reserves changed")
+        prefix = b"".join(self.journal_path.read_bytes().splitlines(keepends=True)[:sequence])
+        if hashlib.sha256(prefix).hexdigest() != upgrade.get("source_journal_sha256"):
+            raise ValueError("timeout source journal prefix changed")
+        for path, key in ((self.root / "metrics/provider_attempts.jsonl", "ledger"),
+                          (self.root / "metrics/budget/budget_events.jsonl", "budget_events")):
+            raw = path.read_bytes(); size = upgrade.get("source_" + key + "_bytes")
+            if (not isinstance(size, int) or isinstance(size, bool) or size < 0 or len(raw) < size
+                    or hashlib.sha256(raw[:size]).hexdigest() != upgrade.get("source_" + key + "_sha256")):
+                raise ValueError("timeout accounting prefix changed")
+
+    def authorize_timeout_accounting_upgrade(self, *, target_code_manifest: dict[str, str], attempt_id: str,
+                                            decision_id: str, prompt_hash: str) -> None:
+        """Record compatibility evidence without resolving or dispatching a request."""
+        with RecoveryLock(self.path / "writer.lock"):
+            rows = self._journal_rows()
+            predecessors = [r for r in rows if r.get("kind") == "known_http_accounting_upgrade_v1"]
+            failures = [r for r in rows if r.get("kind") == "attempt" and r.get("attempt_id") == attempt_id]
+            outstanding = self.in_flight()
+            if (len(predecessors) != 1 or len(failures) != 1 or len(outstanding) != 1
+                    or (outstanding[0].get("attempt_id"), outstanding[0].get("decision_id"), outstanding[0].get("prompt_hash"))
+                       != (attempt_id, decision_id, prompt_hash)
+                    or any(r.get("kind") == "timeout_accounting_upgrade_v1" for r in rows)
+                    or (self.path / "commit_manifest.json").exists()):
+                raise ValueError("timeout upgrade requires the exact sole unresolved attempt")
+            cp_copy = self.path / "timeout-source-checkpoint.json"
+            budget_copy = self.path / "timeout-source-budget.json"
+            if cp_copy.exists() or budget_copy.exists():
+                raise ValueError("timeout source backups already exist; review before retry")
+            _atomic_copy(self.checkpoint_path, cp_copy)
+            _atomic_copy(self.root / "metrics/budget/budget_state.json", budget_copy)
+            ledger = (self.root / "metrics/provider_attempts.jsonl").read_bytes()
+            events = (self.root / "metrics/budget/budget_events.jsonl").read_bytes()
+            previous = predecessors[0]
+            payload = {"kind": "timeout_accounting_upgrade_v1", "http_upgrade_sha256": previous["sha256"],
+                       "from_identity": previous["to_identity"], "to_identity": self.identity,
+                       "source_code_manifest": previous["target_code_manifest"], "target_code_manifest": target_code_manifest,
+                       "failure": failures[0], "source_journal_count": len(rows), "source_journal_head": rows[-1]["sha256"],
+                       "source_journal_sha256": hashlib.sha256(self.journal_path.read_bytes()).hexdigest(),
+                       "source_checkpoint_sha256": _file_hash(cp_copy), "source_budget_sha256": _file_hash(budget_copy),
+                       "source_ledger_bytes": len(ledger), "source_ledger_sha256": hashlib.sha256(ledger).hexdigest(),
+                       "source_budget_events_bytes": len(events), "source_budget_events_sha256": hashlib.sha256(events).hexdigest()}
+            provisional = {**payload, "sequence": len(rows), "previous_hash": rows[-1]["sha256"]}
+            provisional["sha256"] = canonical_hash(provisional)
+            self._validate_journal_semantics([*rows, provisional])
+            self._append(payload)
+
+    def authorize_known_http_accounting_upgrade(self, *, target_code_manifest: dict[str, str],
+                                                attempt_id: str) -> None:
+        """Append compatibility evidence; never dispatch or edit a checkpoint."""
+        with RecoveryLock(self.path / "writer.lock"):
+            rows = self._journal_rows()
+            transitions = [row for row in rows if row.get("kind") == "build_rule_replay_transition_v1"]
+            failures = [row for row in rows if row.get("kind") == "attempt" and row.get("attempt_id") == attempt_id]
+            if (len(transitions) != 1 or len(failures) != 1
+                    or any(row.get("kind") == "known_http_accounting_upgrade_v1" for row in rows)
+                    or self.in_flight() or (self.path / "commit_manifest.json").exists()):
+                raise ValueError("known HTTP upgrade requires one halted unambiguous failure")
+            checkpoint = self._read_checkpoint()
+            if (not checkpoint or not checkpoint.get("halt_required")
+                    or checkpoint.get("halt_reason") != "provider_transient_http"
+                    or checkpoint.get("decision_id") != failures[0].get("decision_id")):
+                raise ValueError("known HTTP upgrade requires the exact halted checkpoint")
+            activation = [row for row in rows if row.get("kind") == "build_rule_activation_v1"]
+            if len(activation) != 1:
+                raise ValueError("known HTTP upgrade requires existing activation")
+            self._validate_build_rule_activation(activation[0], transitions[0], rows)
+            checkpoint_copy = self.path / "known-http-source-checkpoint.json"
+            budget_copy = self.path / "known-http-source-budget.json"
+            if checkpoint_copy.exists() or budget_copy.exists():
+                raise ValueError("known HTTP source backups already exist; review before retry")
+            _atomic_copy(self.checkpoint_path, checkpoint_copy)
+            _atomic_copy(self.root / "metrics/budget/budget_state.json", budget_copy)
+            ledger = (self.root / "metrics/provider_attempts.jsonl").read_bytes()
+            events = (self.root / "metrics/budget/budget_events.jsonl").read_bytes()
+            payload = {"kind": "known_http_accounting_upgrade_v1", "transition_sha256": transitions[0]["sha256"],
+                       "from_identity": transitions[0]["to_identity"], "to_identity": self.identity,
+                       "source_code_manifest": transitions[0]["target_code_manifest"],
+                       "target_code_manifest": target_code_manifest, "failure": failures[0],
+                       "source_journal_count": len(rows), "source_journal_head": rows[-1]["sha256"],
+                       "source_checkpoint_sha256": _file_hash(checkpoint_copy),
+                       "source_budget_sha256": _file_hash(budget_copy),
+                       "source_ledger_bytes": len(ledger), "source_ledger_sha256": hashlib.sha256(ledger).hexdigest(),
+                       "source_budget_events_bytes": len(events), "source_budget_events_sha256": hashlib.sha256(events).hexdigest()}
+            provisional = {**payload, "sequence": len(rows), "previous_hash": rows[-1]["sha256"]}
+            provisional["sha256"] = canonical_hash(provisional)
+            self._validate_known_http_upgrade(transitions[0], [*rows, provisional])
+            self._append(payload)
+
+    def _validate_build_rule_replay_transition(self, receipt: dict[str, Any],
+                                               rows: list[dict[str, Any]]) -> None:
+        """Validate an append-only replay-only transition; it does not authorize adoption."""
+        events = [row for row in rows if row.get("kind") == "build_rule_replay_transition_v1"]
+        if len(events) != 1 or events[0] != receipt:
+            raise ValueError("build replay transition is missing or duplicated")
+        sequence = receipt.get("sequence")
+        if (not isinstance(sequence, int) or isinstance(sequence, bool) or sequence < 1
+                or sequence >= len(rows) or receipt.get("source_journal_count") != sequence
+                or receipt.get("source_journal_head") != rows[sequence - 1].get("sha256")
+                or receipt.get("previous_hash") != receipt.get("source_journal_head")):
+            raise ValueError("build replay transition journal prefix mismatch")
+        source, target = receipt.get("from_identity"), receipt.get("to_identity")
+        if (not isinstance(source, dict) or not isinstance(target, dict)
+                or source.get("experiment_id") != self.root.name
+                or {k: v for k, v in source.items() if k != "code_sha256"}
+                != {k: v for k, v in target.items() if k != "code_sha256"}):
+            raise ValueError("build replay transition changed experiment identity or configuration")
+        if target != self.identity:
+            if any(row.get("kind") == "terminal_currency_accounting_upgrade_v1" for row in rows):
+                self._validate_terminal_currency_upgrade(receipt, rows)
+            else:
+                self._validate_known_http_upgrade(receipt, rows)
+        old_manifest, new_manifest = receipt.get("source_code_manifest"), receipt.get("target_code_manifest")
+        if (not isinstance(old_manifest, dict) or not isinstance(new_manifest, dict)
+                or canonical_hash(old_manifest) != source.get("code_sha256")
+                or canonical_hash(new_manifest) != target.get("code_sha256")):
+            raise ValueError("build replay transition package manifest mismatch")
+        changed = {name for name in set(old_manifest) | set(new_manifest)
+                   if old_manifest.get(name) != new_manifest.get(name)}
+        allowed = {"agents/llm_context.py", "agents/baseline_llm_runtime.py", "core/prompt_assets.py",
+                   "runner/recovery.py", "runner/build_rule_replay_selector.py",
+                   "runner/build_fix_recovery_plan.py",
+                   "runner/build_rule_proof.py", "runner/build_rule_accounting.py"}
+        if not changed or not changed <= allowed or receipt.get("changed_code_paths") != sorted(changed):
+            raise ValueError("build replay transition contains an unapproved code path")
+        checkpoint = receipt.get("source_checkpoint")
+        if (not isinstance(checkpoint, dict) or checkpoint.get("version") != RECOVERY_VERSION
+                or checkpoint.get("sha256") != canonical_hash({k: v for k, v in checkpoint.items() if k != "sha256"})
+                or checkpoint.get("identity") != source or not checkpoint.get("halt_required")):
+            raise ValueError("build replay transition source checkpoint mismatch")
+        backup = self.path / "build-rule-source-checkpoint.json"
+        if (receipt.get("source_checkpoint_file_sha256") != _file_hash(backup)
+                or receipt.get("source_checkpoint_file_sha256") is None):
+            raise ValueError("build replay original checkpoint backup changed")
+        try:
+            if json.loads(backup.read_text(encoding="utf-8")) != checkpoint:
+                raise ValueError("build replay original checkpoint backup differs from receipt")
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError("build replay original checkpoint backup is unreadable") from exc
+        anchor = checkpoint.get("journal_anchor") or {}
+        count = anchor.get("count")
+        if (not isinstance(count, int) or isinstance(count, bool) or count < 1 or count > sequence
+                or rows[count - 1].get("sha256") != anchor.get("head")):
+            raise ValueError("build replay transition checkpoint anchor mismatch")
+        activations = [row for row in rows if row.get("kind") == "build_rule_activation_v1"]
+        if len(activations) > 1:
+            raise ValueError("build rule activation is duplicated")
+        if (receipt.get("source_snapshot_inventory_sha256") != _file_hash(self.path / "snapshot_inventory.json")
+                or any(receipt.get(k) is None for k in ("source_snapshot_inventory_sha256", "source_ledger_sha256", "source_budget_sha256"))):
+            raise ValueError("build replay transition snapshot or accounting changed")
+        if not activations:
+            if (receipt.get("source_ledger_sha256") != _file_hash(self.root / "metrics" / "provider_attempts.jsonl")
+                    or receipt.get("source_budget_sha256") != _file_hash(self.root / "metrics" / "budget" / "budget_state.json")):
+                raise ValueError("build replay transition snapshot or accounting changed")
+        else:
+            self._validate_build_rule_activation(activations[0], receipt, rows)
+        boundary = receipt.get("boundary")
+        if not isinstance(boundary, dict) or set(boundary) != {"decision_id", "attempt_id", "prompt_hash", "response_hash", "amend"}:
+            raise ValueError("build replay transition boundary is invalid")
+        if not isinstance(boundary["amend"], bool):
+            raise ValueError("build replay transition boundary mode is invalid")
+        attempts = [row for row in rows[:sequence] if row.get("kind") == "attempt"
+                    and row.get("outcome") == "received" and row.get("decision_id") == boundary["decision_id"]]
+        if (not attempts or attempts[-1].get("attempt_id") != boundary["attempt_id"]
+                or attempts[-1].get("prompt_hash") != boundary["prompt_hash"]
+                or canonical_hash(attempts[-1].get("response")) != boundary["response_hash"]
+                or any(row.get("kind") == "response_validation" and row.get("attempt_id") == boundary["attempt_id"]
+                       for row in rows[:sequence])):
+            raise ValueError("build replay transition does not bind the latest unvalidated response")
+        if boundary["amend"] and not boundary["decision_id"].endswith("/submit_orders"):
+            raise ValueError("build replay amended boundary is not an order decision")
+        if not boundary["decision_id"].startswith(str(checkpoint.get("cursor", {}).get("game_id", "")) + "/"):
+            raise ValueError("build replay boundary belongs to another game")
+        if boundary["amend"]:
+            decision_parts = boundary["decision_id"].split("/")
+            if (len(decision_parts) != 6 or checkpoint.get("cursor", {}).get("unit") != "phase_started"
+                    or decision_parts[1] != checkpoint.get("cursor", {}).get("phase_id")):
+                raise ValueError("build replay amended boundary does not match the halted phase")
+            try:
+                content = attempts[-1]["response"]["content"]
+                payload = json.loads(content)
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ValueError("build replay boundary response is not a JSON object") from exc
+            if not isinstance(payload, dict) or payload.get("orders") != []:
+                raise ValueError("build replay amended boundary must be the saved empty order response")
+        activation_sequence = activations[0]["sequence"] if activations else len(rows)
+        if any(row.get("kind") in {"dispatch_prepared", "dispatch", "attempt"}
+               for row in rows[sequence + 1:activation_sequence]):
+            raise ValueError("build replay transition cannot authorize a new provider attempt")
+        if any(row.get("kind") == "response_validation" and row.get("attempt_id") == boundary["attempt_id"]
+               for row in rows[sequence + 1:]):
+            raise ValueError("build replay boundary cannot be validated before adoption")
+        current = self._read_checkpoint()
+        source_body = {key: value for key, value in checkpoint.items() if key != "sha256"}
+        if current != source_body:
+            anchor = (current or {}).get("journal_anchor") or {}
+            count = anchor.get("count")
+            if (not isinstance(count, int) or isinstance(count, bool) or count <= sequence + 1
+                    or count > len(rows)):
+                raise ValueError("build replay transition checkpoint identity mismatch")
+            entry = rows[count - 1]
+            if entry.get("kind") != "build_rule_replay_checkpoint_v1":
+                raise ValueError("build replay checkpoint lacks its durable receipt")
+            self._validate_build_rule_replay_checkpoint(entry, receipt, rows)
+            expected = {"version": RECOVERY_VERSION, "identity": entry["identity"], "cursor": entry["cursor"],
+                        "state": entry["state"], "applied": entry["applied"],
+                        "journal_anchor": {"count": count, "head": entry["sha256"]}}
+            if (current or {}).get("halt_required") is True:
+                reason, decision = current.get("halt_reason"), current.get("decision_id")
+                if not any(item.get("kind") == "halt" and item.get("reason") == reason
+                           and item.get("decision_id") == decision for item in rows[count:]):
+                    raise ValueError("build replay halt lacks its durable journal record")
+                expected.update(halt_required=True, halt_reason=reason, decision_id=decision)
+            if current != expected:
+                raise ValueError("build replay checkpoint differs from its durable receipt")
+        outstanding = self.in_flight()
+        if (self.path / "commit_manifest.json").exists():
+            if not activations or outstanding:
+                raise ValueError("build replay transition has unresolved work")
+            self.validate_pending_commit(canonical_root=self.root)
+        if outstanding:
+            if len(outstanding) != 1 or not activations:
+                raise ValueError("build replay transition has unresolved work")
+            item = outstanding[0]
+            attempt = item.get("attempt_id")
+            matches = [row for row in rows if row.get("attempt_id") == attempt]
+            prepared = [row for row in matches if row.get("kind") == "dispatch_prepared"]
+            dispatched = [row for row in matches if row.get("kind") == "dispatch"]
+            outcomes = [row for row in matches if row.get("kind") == "attempt"]
+            identity = (item.get("decision_id"), item.get("prompt_hash"))
+            if (len(prepared) != 1 or len(dispatched) != 1 or len(outcomes) > 1
+                    or any((row.get("decision_id"), row.get("prompt_hash")) != identity
+                           for row in (*prepared, *dispatched, *outcomes))
+                    or not (activations[0]["sequence"] < prepared[0]["sequence"] < dispatched[0]["sequence"])
+                    or (outcomes and (dispatched[0]["sequence"] >= outcomes[0]["sequence"]
+                        or outcomes[0].get("outcome") != "unknown" or outcomes[0].get("error_category") not in {"provider_timeout", "process_interrupted"}
+                        or outcomes[0].get("response") is not None or outcomes[0].get("usage") is not None))):
+                raise ValueError("build replay transition has unresolved work")
+        self._validate_snapshot()
+
+    def authorize_build_rule_replay(self, *, source_code_manifest: dict[str, str],
+                                    target_code_manifest: dict[str, str], decision_id: str,
+                                    attempt_id: str, prompt_hash: str, amend: bool) -> None:
+        """Append a replay-only receipt under the exclusive recovery lock.
+
+        The receipt does not validate or adopt the boundary response, activate
+        the new rules, or authorize any provider call.
+        """
+        with RecoveryLock(self.path / "writer.lock"):
+            rows = self._journal_rows()
+            existing = [row for row in rows if row.get("kind") == "build_rule_replay_transition_v1"]
+            if existing:
+                self._validate_build_rule_replay_transition(existing[0], rows)
+                boundary = existing[0]["boundary"]
+                if (boundary["decision_id"], boundary["attempt_id"], boundary["prompt_hash"], boundary["amend"]) != (
+                        decision_id, attempt_id, prompt_hash, amend):
+                    raise ValueError("existing build replay transition differs from requested boundary")
+                if (existing[0]["source_code_manifest"] != source_code_manifest
+                        or existing[0]["target_code_manifest"] != target_code_manifest):
+                    raise ValueError("existing build replay transition differs from requested package")
+                return
+            self._validate_journal_semantics(rows)
+            checkpoint = self._read_checkpoint()
+            if checkpoint is None or not rows:
+                raise ValueError("build replay transition requires saved recovery evidence")
+            matches = [row for row in rows if row.get("kind") == "attempt" and row.get("attempt_id") == attempt_id
+                       and row.get("decision_id") == decision_id and row.get("prompt_hash") == prompt_hash
+                       and row.get("outcome") == "received"]
+            if len(matches) != 1:
+                raise ValueError("build replay boundary response is missing or ambiguous")
+            before = checkpoint["identity"]
+            backup = self.path / "build-rule-source-checkpoint.json"
+            if backup.exists():
+                if _file_hash(backup) != _file_hash(self.checkpoint_path):
+                    raise ValueError("existing build replay checkpoint backup differs")
+            else:
+                _atomic_copy(self.checkpoint_path, backup)
+            changed = {name for name in set(source_code_manifest) | set(target_code_manifest)
+                       if source_code_manifest.get(name) != target_code_manifest.get(name)}
+            payload = {"kind": "build_rule_replay_transition_v1", "from_identity": before,
+                       "to_identity": self.identity, "source_code_manifest": source_code_manifest,
+                       "target_code_manifest": target_code_manifest, "changed_code_paths": sorted(changed),
+                       "source_journal_count": len(rows), "source_journal_head": rows[-1]["sha256"],
+                       "source_checkpoint": {**checkpoint, "sha256": canonical_hash(checkpoint)},
+                       "source_checkpoint_file_sha256": _file_hash(backup),
+                       "source_snapshot_inventory_sha256": _file_hash(self.path / "snapshot_inventory.json"),
+                       "source_ledger_sha256": _file_hash(self.root / "metrics" / "provider_attempts.jsonl"),
+                       "source_budget_sha256": _file_hash(self.root / "metrics" / "budget" / "budget_state.json"),
+                       "boundary": {"decision_id": decision_id, "attempt_id": attempt_id,
+                                    "prompt_hash": prompt_hash, "response_hash": canonical_hash(matches[0]["response"]),
+                                    "amend": amend}}
+            provisional = {**payload, "sequence": len(rows), "previous_hash": rows[-1]["sha256"]}
+            provisional["sha256"] = canonical_hash(provisional)
+            self._validate_build_rule_replay_transition(provisional, [*rows, provisional])
+            self._append(payload)
+            self._validate_build_rule_replay_transition(self._journal_rows()[-1], self._journal_rows())
+
+    def _validate_build_rule_adoption(self, adoption: dict[str, Any], rows: list[dict[str, Any]]) -> None:
+        from .build_rule_proof import verify_reviewed_boundary
+        transitions = [row for row in rows if row.get("kind") == "build_rule_replay_transition_v1"]
+        adoptions = [row for row in rows if row.get("kind") == "build_rule_boundary_adoption_v1"]
+        if len(transitions) != 1 or len(adoptions) != 1 or adoptions[0] != adoption:
+            raise ValueError("build boundary adoption or transition is missing or duplicated")
+        transition = transitions[0]
+        if adoption.get("sequence", -1) <= transition["sequence"] or adoption.get("transition_sha256") != transition["sha256"]:
+            raise ValueError("build boundary adoption does not continue its transition")
+        evidence = adoption.get("evidence")
+        if not isinstance(evidence, dict) or set(evidence) != {"result", "context", "tree_proof"}:
+            raise ValueError("build boundary adoption evidence is incomplete")
+        evidence_root = (self.path / "build-rule-evidence").resolve()
+        paths, pins = {}, {}
+        for key, item in evidence.items():
+            if not isinstance(item, dict) or set(item) != {"name", "sha256"}:
+                raise ValueError("build boundary adoption evidence entry is invalid")
+            name = item["name"]
+            if not isinstance(name, str) or Path(name).name != name:
+                raise ValueError("build boundary adoption evidence path is invalid")
+            path = evidence_root / name
+            if path.is_symlink() or not path.resolve().is_relative_to(evidence_root):
+                raise ValueError("build boundary adoption evidence escapes its directory")
+            paths[key], pins[key] = path, item["sha256"]
+        proof = verify_reviewed_boundary(receipt=transition, journal_rows=rows,
+            result_path=paths["result"], context_path=paths["context"], tree_proof_path=paths["tree_proof"],
+            expected_hashes=pins)
+        if adoption.get("proof") != proof:
+            raise ValueError("build boundary adoption differs from reviewed replay proof")
+
+    def authorize_build_rule_adoption(self, *, evidence: dict[str, dict[str, str]]) -> None:
+        """Append an adoption of reviewed copied replay evidence; no activation occurs."""
+        with RecoveryLock(self.path / "writer.lock"):
+            rows = self._journal_rows()
+            self._validate_journal_semantics(rows)
+            transition = next((row for row in rows if row.get("kind") == "build_rule_replay_transition_v1"), None)
+            if transition is None:
+                raise ValueError("build boundary adoption requires a replay transition")
+            existing = [row for row in rows if row.get("kind") == "build_rule_boundary_adoption_v1"]
+            if existing:
+                self._validate_build_rule_adoption(existing[0], rows)
+                if existing[0]["evidence"] != evidence:
+                    raise ValueError("existing build boundary adoption differs from requested evidence")
+                return
+            current = self._read_checkpoint()
+            if current is None or current.get("cursor") != transition["source_checkpoint"].get("cursor"):
+                raise ValueError("build boundary adoption requires the reconstructed boundary cursor")
+            payload = {"kind": "build_rule_boundary_adoption_v1", "transition_sha256": transition["sha256"],
+                       "evidence": evidence}
+            provisional = {**payload, "sequence": len(rows), "previous_hash": rows[-1]["sha256"]}
+            provisional["sha256"] = canonical_hash(provisional)
+            # Compute the proof through the same validator used on restart.
+            from .build_rule_proof import verify_reviewed_boundary
+            evidence_root = self.path / "build-rule-evidence"
+            if not isinstance(evidence, dict) or set(evidence) != {"result", "context", "tree_proof"}:
+                raise ValueError("build boundary adoption evidence is incomplete")
+            for value in evidence.values():
+                if (not isinstance(value, dict) or set(value) != {"name", "sha256"}
+                        or not isinstance(value["name"], str) or Path(value["name"]).name != value["name"]):
+                    raise ValueError("build boundary adoption evidence path is invalid")
+            paths = {key: evidence_root / value["name"] for key, value in evidence.items()}
+            pins = {key: value["sha256"] for key, value in evidence.items()}
+            provisional["proof"] = verify_reviewed_boundary(receipt=transition, journal_rows=rows,
+                result_path=paths["result"], context_path=paths["context"], tree_proof_path=paths["tree_proof"],
+                expected_hashes=pins)
+            provisional["sha256"] = canonical_hash({k: v for k, v in provisional.items() if k != "sha256"})
+            self._validate_build_rule_adoption(provisional, [*rows, provisional])
+            self._append({**payload, "proof": provisional["proof"]})
+
+    def _validate_build_rule_activation(self, activation: dict[str, Any], transition: dict[str, Any],
+                                        rows: list[dict[str, Any]]) -> None:
+        from .build_rule_accounting import validate_postactivation_accounting
+        adoptions = [row for row in rows if row.get("kind") == "build_rule_boundary_adoption_v1"]
+        if (len(adoptions) != 1 or activation.get("adoption_sha256") != adoptions[0].get("sha256")
+                or activation.get("transition_sha256") != transition.get("sha256")
+                or activation.get("sequence", -1) <= adoptions[0].get("sequence", -1)):
+            raise ValueError("build rule activation does not follow the exact adoption")
+        self._validate_build_rule_adoption(adoptions[0], rows)
+        validations = [row for row in rows if row.get("kind") == "build_rule_boundary_validation_v1"]
+        if len(validations) > 1:
+            raise ValueError("build boundary validation is duplicated")
+        if validations:
+            self._validate_build_rule_boundary_validation(validations[0], transition, adoptions[0], activation, rows)
+        future = [row for row in rows if row.get("kind") in {"dispatch_prepared", "dispatch", "attempt"}
+                  and row.get("sequence", -1) > activation.get("sequence", -1)]
+        if future and (not validations or min(row["sequence"] for row in future) <= validations[0]["sequence"]):
+            raise ValueError("new provider attempt precedes durable boundary validation")
+        ledger_backup = self.path / "build-rule-source-ledger.jsonl"
+        budget_backup = self.path / "build-rule-source-budget.json"
+        if (_file_hash(ledger_backup) != transition["source_ledger_sha256"]
+                or _file_hash(budget_backup) != transition["source_budget_sha256"]):
+            raise ValueError("build rule activation accounting backup changed")
+        try:
+            baseline_budget = json.loads(budget_backup.read_bytes())
+            current_budget = json.loads((self.root / "metrics/budget/budget_state.json").read_bytes())
+            baseline_ledger = ledger_backup.read_bytes()
+            current_ledger = (self.root / "metrics/provider_attempts.jsonl").read_bytes()
+            events_path = self.root / "metrics/budget/budget_events.jsonl"
+            budget_events = ([json.loads(line) for line in events_path.read_bytes().splitlines() if line]
+                             if events_path.exists() else [])
+        except (OSError, ValueError) as exc:
+            raise ValueError("build rule activation accounting is unreadable") from exc
+        from .provider_import_intents import verified_imports
+        imports = verified_imports(self.path, self.journal_path, current_ledger, current_budget, rows, budget_events)
+        validate_postactivation_accounting(baseline_ledger=baseline_ledger, current_ledger=current_ledger,
+            baseline_budget=baseline_budget, current_budget=current_budget, rows=rows,
+            activation_sequence=activation["sequence"], budget_events=budget_events, verified_imports=imports)
+
+    def _validate_build_rule_boundary_validation(self, validation: dict[str, Any], transition: dict[str, Any],
+            adoption: dict[str, Any], activation: dict[str, Any], rows: list[dict[str, Any]]) -> None:
+        boundary, proof = transition["boundary"], adoption["proof"]
+        version = "amended_build_v1" if boundary["amend"] else "historical_negotiation_v1"
+        expected = {"transition_sha256": transition["sha256"], "adoption_sha256": adoption["sha256"],
+                    "activation_sha256": activation["sha256"], "decision_id": boundary["decision_id"],
+                    "attempt_id": boundary["attempt_id"], "prompt_hash": boundary["prompt_hash"],
+                    "response_hash": boundary["response_hash"], "context_sha256": proof["context_sha256"],
+                    "validator_version": version, "valid": True}
+        if (validation.get("sequence", -1) <= activation.get("sequence", -1)
+                or any(validation.get(key) != value for key, value in expected.items())):
+            raise ValueError("durable build boundary validation differs from the adopted response")
+
+    def record_build_rule_boundary_validation(self) -> None:
+        rows = self._journal_rows()
+        transition = next((row for row in rows if row.get("kind") == "build_rule_replay_transition_v1"), None)
+        adoption = next((row for row in rows if row.get("kind") == "build_rule_boundary_adoption_v1"), None)
+        activation = next((row for row in rows if row.get("kind") == "build_rule_activation_v1"), None)
+        if (transition is None or adoption is None or activation is None
+                or not getattr(getattr(self, "build_rule_replay_selector", None), "_boundary_crossed", False)):
+            raise ValueError("boundary validation requires the exact adopted response to be replayed")
+        existing = [row for row in rows if row.get("kind") == "build_rule_boundary_validation_v1"]
+        if existing:
+            if len(existing) != 1:
+                raise ValueError("build boundary validation is duplicated")
+            self._validate_build_rule_boundary_validation(existing[0], transition, adoption, activation, rows)
+            return
+        boundary = transition["boundary"]
+        self._append({"kind": "build_rule_boundary_validation_v1", "transition_sha256": transition["sha256"],
+            "adoption_sha256": adoption["sha256"], "activation_sha256": activation["sha256"],
+            "decision_id": boundary["decision_id"], "attempt_id": boundary["attempt_id"],
+            "prompt_hash": boundary["prompt_hash"], "response_hash": boundary["response_hash"],
+            "context_sha256": adoption["proof"]["context_sha256"],
+            "validator_version": "amended_build_v1" if boundary["amend"] else "historical_negotiation_v1",
+            "valid": True})
+
+    def authorize_build_rule_activation(self) -> None:
+        """Activate a reviewed adoption under lock without dispatching a request."""
+        with RecoveryLock(self.path / "writer.lock"):
+            rows = self._journal_rows()
+            self._validate_journal_semantics(rows)
+            transition = next((row for row in rows if row.get("kind") == "build_rule_replay_transition_v1"), None)
+            adoption = next((row for row in rows if row.get("kind") == "build_rule_boundary_adoption_v1"), None)
+            if transition is None or adoption is None:
+                raise ValueError("build rule activation requires validated transition and adoption")
+            existing = [row for row in rows if row.get("kind") == "build_rule_activation_v1"]
+            if existing:
+                self._validate_build_rule_activation(existing[0], transition, rows)
+                return
+            if self.in_flight():
+                raise ValueError("build rule activation cannot proceed with unresolved provider requests")
+            for source, backup, expected in (
+                (self.root / "metrics/provider_attempts.jsonl", self.path / "build-rule-source-ledger.jsonl", transition["source_ledger_sha256"]),
+                (self.root / "metrics/budget/budget_state.json", self.path / "build-rule-source-budget.json", transition["source_budget_sha256"]),
+            ):
+                if _file_hash(source) != expected:
+                    raise ValueError("build rule activation source accounting changed")
+                if backup.exists():
+                    if _file_hash(backup) != expected:
+                        raise ValueError("build rule activation accounting backup differs")
+                else:
+                    _atomic_copy(source, backup)
+            payload = {"kind": "build_rule_activation_v1", "transition_sha256": transition["sha256"],
+                       "adoption_sha256": adoption["sha256"]}
+            provisional = {**payload, "sequence": len(rows), "previous_hash": rows[-1]["sha256"]}
+            provisional["sha256"] = canonical_hash(provisional)
+            self._validate_build_rule_activation(provisional, transition, [*rows, provisional])
+            self._append(payload)
+
     def _validate_journal_semantics(self, rows: list[dict[str, Any]]) -> None:
         attempts: dict[str, tuple[str, str]] = {}
         dispatched: set[str] = set()
         corrections: dict[str, dict[str, Any]] = {}
         for row in rows:
             kind = row["kind"]
+            if kind == "timeout_accounting_upgrade_v1":
+                prior = rows[:row["sequence"]]
+                if (sum(item.get("kind") == "build_rule_replay_transition_v1" for item in prior) != 1
+                        or sum(item.get("kind") == "known_http_accounting_upgrade_v1" for item in prior) != 1):
+                    raise ValueError("timeout upgrade lacks its historical source chain")
+            if kind == "build_rule_replay_transition_v1":
+                self._validate_build_rule_replay_transition(row, rows)
+            if kind == "build_rule_replay_checkpoint_v1":
+                prior = [item for item in rows[:row["sequence"]]
+                         if item.get("kind") == "build_rule_replay_transition_v1"]
+                if len(prior) != 1:
+                    raise ValueError("build replay checkpoint lacks its transition")
+                self._validate_build_rule_replay_checkpoint(row, prior[0], rows)
+            if kind == "build_rule_boundary_adoption_v1":
+                self._validate_build_rule_adoption(row, rows)
+            if kind == "build_rule_activation_v1":
+                transition = next((item for item in rows[:row["sequence"]]
+                                   if item.get("kind") == "build_rule_replay_transition_v1"), None)
+                if transition is None:
+                    raise ValueError("build rule activation lacks its transition")
+                self._validate_build_rule_activation(row, transition, rows)
+            if kind == "build_rule_boundary_validation_v1":
+                transition = next((item for item in rows[:row["sequence"]] if item.get("kind") == "build_rule_replay_transition_v1"), None)
+                adoption = next((item for item in rows[:row["sequence"]] if item.get("kind") == "build_rule_boundary_adoption_v1"), None)
+                activation = next((item for item in rows[:row["sequence"]] if item.get("kind") == "build_rule_activation_v1"), None)
+                if transition is None or adoption is None or activation is None:
+                    raise ValueError("build boundary validation lacks its authorization chain")
+                self._validate_build_rule_boundary_validation(row, transition, adoption, activation, rows)
             if kind == "repeat_correction_intent":
                 if not self.repeat_received_invalid:
                     raise ValueError("repeat correction journal requires its explicit policy")
@@ -1928,13 +2788,100 @@ class ExperimentRecovery:
                 resolved.add(attempt_id)
         return bool(dispatched - resolved)
 
-    def resolve_unknown(self, *, decision_id: str, attempt_id: str, choice: str) -> None:
+    def assert_dispatch_allowed(self, *, decision_id: str, prompt_hash: str) -> None:
+        if self.in_flight():
+            raise RuntimeError("Recovery required: unresolved provider dispatch needs an explicit decision")
+        rows = self._journal_rows()
+        for index, row in enumerate(rows):
+            if row.get("kind") != "unknown_resolved" or row.get("choice") != "retry_after_review":
+                continue
+            later = rows[index + 1:]
+            replacements = [item for item in later if item.get("kind") == "dispatch_prepared"
+                            and item.get("decision_id") == row.get("decision_id")]
+            recovered = any(item.get("kind") == "attempt" and item.get("attempt_id") == row.get("attempt_id")
+                            and item.get("outcome") == "received" for item in later)
+            if recovered and replacements:
+                raise RuntimeError("Recovery required: original and replacement both have evidence")
+            if recovered:
+                continue
+            if replacements:
+                replacement = replacements[-1]
+                if decision_id == row.get("decision_id"):
+                    permitted = any(item.get("attempt_id") == replacement.get("attempt_id")
+                                    and item.get("kind") in {"unknown_resolved", "response_skipped"}
+                                    and item.get("choice") == "retry_after_review"
+                                    and item.get("prompt_hash") == prompt_hash
+                                    and (item.get("kind") == "unknown_resolved" or (
+                                        any(p.get("kind") == "attempt" and p.get("attempt_id") == replacement.get("attempt_id")
+                                            and p.get("outcome") == "received" for p in later[:later.index(item)])
+                                        and [v for v in later[:later.index(item)] if v.get("kind") == "response_validation"
+                                             and v.get("attempt_id") == replacement.get("attempt_id")][-1:]
+                                            == [v for v in later[:later.index(item)] if v.get("kind") == "response_validation"
+                                                and v.get("attempt_id") == replacement.get("attempt_id")
+                                                and v.get("decision_id") == decision_id
+                                                and v.get("prompt_hash") == replacement.get("prompt_hash")
+                                                and v.get("valid") is False][-1:]
+                                        and any(v.get("kind") == "response_validation" and v.get("attempt_id") == replacement.get("attempt_id")
+                                                for v in later[:later.index(item)]))) for item in later)
+                    intents = [item for item in later if item.get("kind") in {"repeat_correction_intent", "order_correction_intent"}
+                               and item.get("decision_id") == decision_id
+                               and item.get("parent_attempt_id") == replacement.get("attempt_id")
+                               and item.get("correction_prompt_hash") == prompt_hash]
+                    if len(intents) == 1 and rows.index(intents[0]) > rows.index(replacement):
+                        intent = intents[0]
+                        if any(item.get("kind") == "response_validation" and item.get("attempt_id") == replacement.get("attempt_id")
+                               for item in rows[rows.index(intent) + 1:]):
+                            raise RuntimeError("Recovery required: correction parent validation changed")
+                        if intent.get("kind") == "repeat_correction_intent":
+                            self._validate_repeat_correction(intent, rows)
+                            permitted = True
+                        else:
+                            parent = [item for item in rows[:rows.index(intent)] if item.get("kind") == "attempt"
+                                      and item.get("attempt_id") == replacement.get("attempt_id")
+                                      and item.get("decision_id") == decision_id and item.get("outcome") == "received"]
+                            validations = [item for item in rows[:rows.index(intent)] if item.get("kind") == "response_validation"
+                                           and item.get("attempt_id") == replacement.get("attempt_id")
+                                           and item.get("decision_id") == decision_id and item.get("valid") is False]
+                            if (len(parent) == 1 and len(validations) == 1
+                                    and intent.get("base_prompt_hash") == replacement.get("prompt_hash")
+                                    and parent[0].get("prompt_hash") == replacement.get("prompt_hash")
+                                    and validations[0].get("prompt_hash") == replacement.get("prompt_hash")
+                                    and canonical_hash(parent[0].get("response")) == intent.get("parent_response_hash")
+                                    and canonical_hash(validations[0]) == intent.get("parent_validation_hash")
+                                    and isinstance(intent.get("feedback"), dict)
+                                    and isinstance(validations[0].get("issue"), str) and bool(validations[0]["issue"])
+                                    and intent["feedback"].get("rejected_answer") == (parent[0].get("response") or {}).get("content")
+                                    and (intent["feedback"].get("validator_issue") == validations[0].get("issue")
+                                         or intent["feedback"].get("runtime_error") == validations[0].get("issue"))
+                                    and canonical_hash(intent["feedback"]) == intent.get("feedback_hash")):
+                                permitted = True
+                    if not permitted:
+                        raise RuntimeError("Recovery required: replacement authorization is already consumed")
+                continue
+            if (decision_id, prompt_hash) != (row.get("decision_id"), row.get("prompt_hash")):
+                raise RuntimeError("Recovery required: the authorized replacement must be dispatched first")
+
+    def resolve_unknown(self, *, decision_id: str, attempt_id: str, choice: str, prompt_hash: str | None = None) -> None:
         if choice not in {"retry_after_review", "abandon_decision"}:
             raise ValueError("unknown outcome choice must be retry_after_review or abandon_decision")
         pending = next((row for row in self.in_flight()
                         if row.get("decision_id") == decision_id and row.get("attempt_id") == attempt_id), None)
-        if pending is None:
+        if pending is None or not prompt_hash or pending.get("prompt_hash") != prompt_hash:
             raise ValueError("unknown dispatch does not match an unresolved attempt")
+        if len(self.in_flight()) != 1:
+            raise ValueError("unknown decision requires exactly one unresolved attempt")
+        rows = self._journal_rows()
+        related = [row for row in rows if row.get("attempt_id") == attempt_id]
+        prepared = [row for row in related if row.get("kind") == "dispatch_prepared"]
+        dispatched = [row for row in related if row.get("kind") == "dispatch"]
+        outcomes = [row for row in related if row.get("kind") == "attempt"]
+        if (len(prepared) != 1 or len(dispatched) != 1 or len(outcomes) > 1
+                or (outcomes and outcomes[0].get("outcome") != "unknown")
+                or any((row.get("decision_id"), row.get("prompt_hash")) != (decision_id, prompt_hash)
+                       for row in (*prepared, *dispatched, *outcomes))
+                or not (rows.index(prepared[0]) < rows.index(dispatched[0]))
+                or (outcomes and rows.index(dispatched[0]) >= rows.index(outcomes[0]))):
+            raise ValueError("unknown decision requires a recorded unresolved provider outcome")
         self._append({"kind": "unknown_resolved", "decision_id": decision_id,
                       "prompt_hash": pending["prompt_hash"], "attempt_id": attempt_id, "choice": choice})
 

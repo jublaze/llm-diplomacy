@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import math
@@ -32,6 +33,19 @@ def json_lines(path):
 
 def stamp(value):
     return datetime.fromisoformat(value).timestamp()
+
+
+_PLAN_VALIDATION_TOKEN = object()
+
+
+class ValidatedImportPlan(dict):
+    """A plan produced by this process's complete original-response validation."""
+
+    def __init__(self, token, **kwargs):
+        if token is not _PLAN_VALIDATION_TOKEN:
+            raise ValueError("provider import plan must be created by original-response validation")
+        super().__init__(**kwargs)
+        self.validated_sha256 = canonical_hash(self)
 
 
 def fetch_records(runner, recovery, manifest):
@@ -124,8 +138,17 @@ def build_plan(runner, recovery, manifest):
     recovery._validate_snapshot()
     if cp is None or cp["identity"] != recovery.identity:
         raise ValueError("recovery identity mismatch")
-    if not cp.get("halt_required") or (recovery.path / "commit_manifest.json").exists():
+    pending = recovery.in_flight()
+    if (recovery.path / "commit_manifest.json").exists():
         raise ValueError("import requires a halted run without pending publication")
+    if not cp.get("halt_required"):
+        if len(pending) != 1 or pending[0].get("kind") != "dispatch":
+            raise ValueError("import requires a halted run or one interrupted durable dispatch")
+        attempts = [row for row in recovery._journal_rows() if row.get("kind") == "attempt"
+                    and row.get("attempt_id") == pending[0].get("attempt_id")]
+        if attempts and not (len(attempts) == 1 and attempts[0].get("outcome") == "unknown"
+                             and attempts[0].get("error_category") == "process_interrupted"):
+            raise ValueError("unhalted import requires an interrupted dispatch")
     rows = recovery._journal_rows()
     entries = manifest.get("responses", [])
     if not entries or len({e["attempt_id"] for e in entries}) != len(entries):
@@ -137,8 +160,12 @@ def build_plan(runner, recovery, manifest):
         attempt = entry["attempt_id"]
         prepared = next((r for r in rows if r.get("kind") == "dispatch_prepared" and r.get("attempt_id") == attempt), None)
         dispatched = next((r for r in rows if r.get("kind") == "dispatch" and r.get("attempt_id") == attempt), None)
-        if prepared is None or dispatched is None or not any(r.get("kind") == "attempt" and
-                r.get("attempt_id") == attempt and r.get("outcome") == "unknown" for r in rows):
+        attempts = [r for r in rows if r.get("kind") == "attempt" and r.get("attempt_id") == attempt]
+        missing_outcome = (not attempts and len(pending) == 1 and pending[0].get("kind") == "dispatch"
+                           and pending[0].get("attempt_id") == attempt)
+        if (prepared is None or dispatched is None or
+                (prepared.get("decision_id"), prepared.get("prompt_hash")) != (dispatched.get("decision_id"), dispatched.get("prompt_hash")) or
+                not (missing_outcome or any(r.get("outcome") == "unknown" for r in attempts))):
             raise ValueError("record does not belong to an original unknown request")
         response, inputs = read(entry["response_path"]), read(entry["input_path"])
         if response.get("id") != entry["response_id"] or not str(response["id"]).startswith("resp_"):
@@ -189,6 +216,9 @@ def build_plan(runner, recovery, manifest):
             "response_id": response["id"], "response_sha256": canonical_hash(response),
             "input_sha256": canonical_hash(inputs), "created_at": response["created_at"],
             "completed_at": response["completed_at"],
+            "source_response": response, "source_input": inputs,
+            "provider_pricing": {"input_cost_per_1k_tokens": config.input_cost_per_1k_tokens,
+                                 "output_cost_per_1k_tokens": config.output_cost_per_1k_tokens},
             "provider_elapsed_seconds": response["completed_at"] - response["created_at"], "usage": usage,
             "response": {"content": content, "model": response["model"],
                          "raw": {"response": {"id": response["id"]}, "usage": usage,
@@ -201,6 +231,9 @@ def build_plan(runner, recovery, manifest):
     decision = observations[0]["decision_id"]
     unknowns = {r["attempt_id"] for r in rows if r.get("kind") == "attempt" and
                 r.get("outcome") == "unknown" and r.get("decision_id") == decision}
+    unknowns.update(item["attempt_id"] for item in pending if item.get("kind") == "dispatch"
+                    and item.get("decision_id") == decision and not any(
+                        row.get("kind") == "attempt" and row.get("attempt_id") == item["attempt_id"] for row in rows))
     correction = recovery.order_correction_intent(decision)
     if correction is not None:
         resolved_for_retry = {
@@ -242,8 +275,32 @@ def build_plan(runner, recovery, manifest):
                        for r in originals)):
             raise ValueError("retrieval does not match the exact durable corrective request")
     validate_selected(root, recovery, decision, observations[0]["response"]["content"])
-    return {"identity": recovery.identity, "selected_attempt_id": observations[0]["attempt_id"],
-            "observations": observations}
+    game, phase, _, _, agent, method = decision.split("/")
+    validation_path = recovery.working_root / "experiments" / root.name / "games" / game / "agents" / agent / "runtime/phase_inputs" / f"{phase}_{method}.json"
+    validation_context = read(validation_path)
+    routes = [runner._player_provider(player) for player in runner.config.players]
+    def has_secret(value):
+        if isinstance(value, dict):
+            return any(key.lower() in {"api_key", "token", "secret", "password"} or has_secret(item)
+                       for key, item in value.items())
+        return isinstance(value, list) and any(has_secret(item) for item in value)
+    if has_secret(routes):
+        raise ValueError("provider route contains a secret; no import proof was written")
+    if recovery.identity.get("routes_sha256") is not None and canonical_hash(routes) != recovery.identity["routes_sha256"]:
+        raise ValueError("provider routes differ from the recovery identity")
+    def scrub(value):
+        if isinstance(value, dict):
+            return {key: scrub(item) for key, item in value.items() if key.lower() not in {"api_key", "token", "secret", "password"}}
+        if isinstance(value, list):
+            return [scrub(item) for item in value]
+        return value
+    configuration = scrub(getattr(runner.config, "raw", None))
+    if recovery.identity.get("configuration_sha256") is not None and canonical_hash(configuration) != recovery.identity["configuration_sha256"]:
+        raise ValueError("provider configuration differs from the recovery identity")
+    return ValidatedImportPlan(_PLAN_VALIDATION_TOKEN, identity=recovery.identity, selected_attempt_id=observations[0]["attempt_id"],
+                               observations=observations, validation_context=validation_context,
+                               validation_context_sha256=canonical_hash(validation_context), provider_routes=routes,
+                               provider_agents=[player.agent_id for player in runner.config.players], provider_configuration=configuration)
 
 
 def validate_repeat_originals(recovery, rows, observations, originals):
@@ -281,13 +338,28 @@ class ReadOnlyBudget(BudgetController):
         pass
 
 
+def import_transaction_path(recovery, plan):
+    path = recovery.path / "provider_imports" / canonical_hash(plan)
+    legacy = {k: v for k, v in plan.items() if k not in {"validation_context", "validation_context_sha256", "provider_routes", "provider_agents", "provider_configuration"}}
+    legacy["observations"] = [{k: v for k, v in row.items()
+              if k not in {"source_response", "source_input", "provider_pricing"}} for row in plan["observations"]]
+    legacy_path = recovery.path / "provider_imports" / canonical_hash(legacy)
+    if legacy_path != path and legacy_path.exists() and not path.exists():
+        raise ValueError("legacy provider import transaction requires separate compatibility review")
+    return path
+
+
 def reconcile_accounting(runner, recovery, *, request_rows=None, dry_run=False, preserve_handled_http=False):
     """Restore known totals only when every actual dispatch has proven usage."""
     rows = recovery._journal_rows()
     recovery._validate_journal_semantics(rows)
     cp = recovery._read_checkpoint()
     terminal_read_only = dry_run and cp is not None and cp.get("cursor", {}).get("unit") == "population_reports_completed"
-    if cp is None or cp["identity"] != recovery.identity or not (cp.get("halt_required") or terminal_read_only):
+    upgrades = [row for row in rows if row.get("kind") == "terminal_currency_accounting_upgrade_v1"]
+    terminal_compatible = (terminal_read_only and len(upgrades) == 1
+                           and upgrades[0].get("from_identity") == cp.get("identity")
+                           and upgrades[0].get("to_identity") == recovery.identity)
+    if cp is None or (cp["identity"] != recovery.identity and not terminal_compatible) or not (cp.get("halt_required") or terminal_read_only):
         raise ValueError("accounting reconciliation requires the same halted identity")
     if request_rows is not None and not dry_run:
         raise ValueError("proposed request rows require a dry run")
@@ -440,10 +512,28 @@ def reconcile_accounting(runner, recovery, *, request_rows=None, dry_run=False, 
 
 def apply_plan(runner, recovery, plan):
     """Caller holds writer.lock. Preserve history; settle once; import earliest last."""
-    path = recovery.path / "provider_imports" / canonical_hash(plan)
+    if not isinstance(plan, ValidatedImportPlan) or canonical_hash(plan) != plan.validated_sha256:
+        raise ValueError("provider import requires a freshly validated plan")
+    path = import_transaction_path(recovery, plan)
+    checkpoint = recovery._read_checkpoint()
+    for observation in plan["observations"]:
+        attempt = observation["attempt_id"]
+        attempts = [row for row in recovery._journal_rows() if row.get("kind") == "attempt" and row.get("attempt_id") == attempt]
+        if not attempts:
+            pending = recovery.in_flight()
+            if (len(pending) != 1 or pending[0].get("kind") != "dispatch"
+                    or (pending[0].get("attempt_id"), pending[0].get("decision_id"), pending[0].get("prompt_hash"))
+                    != (attempt, observation["decision_id"], observation["prompt_hash"])):
+                raise ValueError("interrupted import does not match the sole durable dispatch")
+            recovery.record_response(decision_id=observation["decision_id"], prompt_hash=observation["prompt_hash"],
+                attempt_id=attempt, provider=observation["provider"], response=None, usage=None,
+                error_category="process_interrupted", outcome="unknown")
+    if checkpoint is not None and not checkpoint.get("halt_required"):
+        recovery.halt(reason="process_interrupted", decision_id=plan["observations"][0]["decision_id"])
     path.mkdir(parents=True, exist_ok=True)
     transaction = path / "transaction.json"
     budget_path = recovery.root / "metrics/budget/budget_state.json"
+    events_path = budget_path.parent / "budget_events.jsonl"
     ledger = recovery.root / "metrics/provider_attempts.jsonl"
     if transaction.exists():
         before = read(transaction)
@@ -453,8 +543,21 @@ def apply_plan(runner, recovery, plan):
         before = {"plan": plan, "budget_before": read(budget_path),
                   "ledger_sha256": hashlib.sha256(ledger.read_bytes()).hexdigest(),
                   "journal_before": recovery.journal_path.read_text(encoding="utf-8"),
-                  "checkpoint_before": read(recovery.checkpoint_path)}
+                  "checkpoint_before": read(recovery.checkpoint_path),
+                  "budget_events_before": events_path.read_text(encoding="utf-8") if events_path.exists() else ""}
         atomic_json(transaction, before)
+    rows = recovery._journal_rows()
+    if any(row.get("kind") == "build_rule_activation_v1" for row in rows):
+        plan_hash = canonical_hash(plan)
+        intents = [row for row in rows if row.get("kind") == "provider_import_intent_v1"
+                   and row.get("plan_sha256") == plan_hash]
+        expected = {"plan_sha256": plan_hash, "transaction_sha256": canonical_hash(before)}
+        if len(intents) > 1 or (intents and any(intents[0].get(k) != v for k, v in expected.items())):
+            raise ValueError("provider import intent changed or duplicated")
+        if not intents:
+            if recovery.journal_path.read_text(encoding="utf-8") != before["journal_before"]:
+                raise ValueError("provider import history changed before intent")
+            recovery._append({"kind": "provider_import_intent_v1", **expected})
     if hashlib.sha256(ledger.read_bytes()).hexdigest() != before["ledger_sha256"]:
         raise ValueError("actual request ledger changed during import")
     state = read(budget_path)
@@ -472,8 +575,60 @@ def apply_plan(runner, recovery, plan):
             raise ValueError("original reservation was not pending at import start")
     budget = BudgetController(schema_version=runner.config.schema_version, experiment_id=runner.config.experiment_id,
                               artifact_root=budget_path.parent, config=BudgetConfig(**runner.config.budget))
+    activated = any(row.get("kind") == "build_rule_activation_v1" for row in rows)
+    expected_budget = copy.deepcopy(baseline)
     for r in plan["observations"]:
-        budget.settle_reservation(reservation_id=r["reservation_id"], usage=r["usage"])
+        if not activated:
+            budget.settle_reservation(reservation_id=r["reservation_id"], usage=r["usage"])
+            continue
+        from llm_diplomacy.runner.provider_import_intents import settled_status
+        expected_budget = settled_status(expected_budget, r["reservation_id"], r["usage"])
+        events_text = events_path.read_text(encoding="utf-8") if events_path.exists() else ""
+        prefix = before.get("budget_events_before")
+        if not isinstance(prefix, str) or not events_text.startswith(prefix):
+            raise ValueError("provider import budget event prefix changed")
+        game, phase, _, _, agent, method = r["decision_id"].split("/")
+        prefix_count = len(prefix.splitlines())
+        events = [json.loads(line) for line in events_text.splitlines()]
+        matching = [(index, event) for index, event in enumerate(events[prefix_count:], prefix_count)
+                    if event.get("event_type") == "budget_usage_update"
+                    and event.get("experiment_id") == runner.config.experiment_id
+                    and all(event.get("payload", {}).get(k) == v for k, v in
+                            {"game_id": game, "phase_id": phase, "agent_id": agent, "method": method}.items())
+                    and event.get("payload", {}).get("usage") == r["usage"]
+                    and event.get("payload", {}).get("totals") == expected_budget]
+        if len(matching) > 1:
+            raise ValueError("provider import settlement event is duplicated")
+        if r["reservation_id"] in budget.pending_reservations and matching:
+            candidate = copy.deepcopy(budget)
+            candidate._append_event = lambda *args, **kwargs: None
+            candidate._flush_state = lambda: None
+            candidate.settle_reservation(reservation_id=r["reservation_id"], usage=r["usage"])
+            if candidate.status() != expected_budget:
+                raise ValueError("provider import settlement state differs from event")
+            append_event = budget._append_event
+            budget._append_event = lambda *args, **kwargs: None
+            try:
+                budget.settle_reservation(reservation_id=r["reservation_id"], usage=r["usage"])
+            finally:
+                budget._append_event = append_event
+        elif r["reservation_id"] in budget.pending_reservations:
+            budget.settle_reservation(reservation_id=r["reservation_id"], usage=r["usage"])
+            events = json_lines(events_path)
+            matching = [(len(events) - 1, events[-1])]
+            if events[-1].get("payload", {}).get("totals") != expected_budget:
+                raise ValueError("provider import settlement did not produce expected totals")
+        if len(matching) != 1:
+            raise ValueError("provider import settlement event is missing")
+        index, event = matching[0]
+        marker = {"plan_sha256": plan_hash, "attempt_id": r["attempt_id"],
+                  "event_index": index, "event_sha256": canonical_hash(event)}
+        existing = [row for row in recovery._journal_rows() if row.get("kind") == "provider_import_settlement_v1"
+                    and row.get("plan_sha256") == plan_hash and row.get("attempt_id") == r["attempt_id"]]
+        if len(existing) > 1 or (existing and any(existing[0].get(k) != v for k, v in marker.items())):
+            raise ValueError("provider import settlement marker changed")
+        if not existing:
+            recovery._append({"kind": "provider_import_settlement_v1", **marker})
     # Reverse order makes the earliest original attempt the selected cached answer.
     for r in reversed(plan["observations"]):
         previous = [x for x in recovery._journal_rows() if x.get("kind") == "attempt" and
@@ -490,7 +645,7 @@ def apply_plan(runner, recovery, plan):
         raise ValueError("cached selection differs from earliest original response")
     accounting = reconcile_accounting(runner, recovery)
     receipt = {"completed_at": datetime.now(timezone.utc).isoformat(), "selected_attempt_id": selected["attempt_id"],
-               "observations": [{k: v for k, v in r.items() if k != "response"} for r in plan["observations"]],
+               "observations": [{k: v for k, v in r.items() if k not in {"response", "source_response", "source_input"}} for r in plan["observations"]],
                "actual_requests_added": 0, "reconciled_totals": accounting,
                "accounting": "Configured-price estimates; all remote completions counted, including unused duplicates."}
     if not (path / "receipt.json").exists():
@@ -502,7 +657,7 @@ def complete_interrupted_import(runner, recovery, plan, *, apply=False):
     """Caller holds writer.lock; restore one lost final ledger row from a verified import."""
     if len(plan["observations"]) != 1:
         raise ValueError("interrupted import requires exactly one original response")
-    path = recovery.path / "provider_imports" / canonical_hash(plan)
+    path = import_transaction_path(recovery, plan)
     transaction = read(path / "transaction.json")
     if transaction["plan"] != plan:
         raise ValueError("interrupted import transaction changed")

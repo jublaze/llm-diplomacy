@@ -1237,7 +1237,8 @@ def test_adjustment_invalid_build_falls_back_to_deterministic_legal_build(tmp_pa
     )
     payload = json.loads(output_file.read_text(encoding="utf-8"))
     assert payload["llm_meta"]["fallback_applied"] is True
-    assert payload["llm_meta"]["order_grounding"]["legal_order_context"]["adjustment"]["required_count"] == 1
+    assert payload["llm_meta"]["order_grounding"]["legal_order_context"]["adjustment"]["required_count"] == 0
+    assert payload["llm_meta"]["order_grounding"]["legal_order_context"]["adjustment"]["maximum_count"] == 1
 
 
 def test_submit_order_prompt_contains_legal_order_context_with_exact_units(tmp_path: Path) -> None:

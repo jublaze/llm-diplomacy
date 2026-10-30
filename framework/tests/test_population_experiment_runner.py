@@ -298,7 +298,7 @@ def test_strict_population_resume_reuses_received_responses_and_publishes_once(t
     monkeypatch.setattr(ExperimentRecovery, "_apply_commit", interrupt_report_publish)
     with pytest.raises(RuntimeError, match="simulated crash during final report publication"):
         runner.run(resume=True, decision_action="retry_unknown",
-                   decision_id=pending["decision_id"], attempt_id=pending["attempt_id"])
+                   decision_id=pending["decision_id"], attempt_id=pending["attempt_id"], prompt_hash=pending["prompt_hash"])
     assert report_publish_interrupted
     assert len(provider.calls) == 11  # all provider work finished before report publication
     runner.run(resume=True)

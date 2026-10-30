@@ -215,7 +215,8 @@ def test_interrupted_import_preserves_prior_ledger_and_reviewed_unknown_reserves
     recovery.checkpoint(cursor={"unit": "phase_started"}, state={}, applied=[])
     for attempt in ("attempt-0", "attempt-1"):
         original = next(row for row in rows if row.get("attempt_id") == attempt)
-        recovery.resolve_unknown(decision_id=original["decision_id"], attempt_id=attempt, choice="retry_after_review")
+        recovery._append({"kind": "unknown_resolved", "decision_id": original["decision_id"],
+                          "attempt_id": attempt, "prompt_hash": original["prompt_hash"], "choice": "retry_after_review"})
     recovery.halt(reason="process_interrupted")
     ledger = recovery.root / "metrics/provider_attempts.jsonl"
     prefix = b"".join(ledger.read_bytes().splitlines(keepends=True)[:2])
@@ -466,7 +467,7 @@ def test_corrective_import_preserves_reviewed_unknown_reserve(case, method):
                                    "completion_tokens": 20, "total_tokens": 30, "estimated_cost_usd": .000011})
             r._append(item)
         if attempt_id == "attempt-0":
-            r.resolve_unknown(decision_id=decision, attempt_id=attempt_id, choice="retry_after_review")
+            r.resolve_unknown(decision_id=decision, attempt_id=attempt_id, prompt_hash=base_hash, choice="retry_after_review")
     r.record_validation(decision_id=decision, prompt_hash=base_hash, attempt_id="attempt-1",
                         valid=False, issue="parent rejected")
     feedback = ({"method": "reflect", "validator_issue": "wrong reflection schema",
