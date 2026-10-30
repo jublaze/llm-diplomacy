@@ -108,12 +108,11 @@ def validate_postactivation_accounting(*, baseline_ledger: bytes, current_ledger
                 or (key != "estimated_cost_usd" or additional_reserves)
                    and abs(after - before - reserve_increments[key]) > 1e-8):
             raise ValueError("historical reserved totals changed")
-        if key == "estimated_cost_usd" and not additional_reserves:
-            if after != before and not budget_events:
+        if key == "estimated_cost_usd" and not additional_reserves and after != before:
+            if not budget_events:
                 raise ValueError("reservation trace required for changed pending cost")
-            if budget_events:
-                from .reservation_currency_trace import verify_pending_currency_trace
-                verify_pending_currency_trace(baseline_budget, current_budget, budget_events, requests)
+            from .reservation_currency_trace import verify_pending_currency_trace
+            verify_pending_currency_trace(baseline_budget, current_budget, budget_events, requests)
     if current_budget.get("total_provider_calls") != baseline_budget.get("total_provider_calls", -1) + len(requests):
         raise ValueError("post-activation provider call count differs from budget")
     for key, increment in totals.items():

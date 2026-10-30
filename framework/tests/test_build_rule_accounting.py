@@ -38,6 +38,34 @@ def test_postactivation_known_usage_and_uncertain_reserve_are_reconciled():
     validate_postactivation_accounting(**setup())
 
 
+def test_unchanged_uncertain_baseline_needs_no_matching_usage_snapshot():
+    data = setup()
+    data["current_ledger"] = data["baseline_ledger"]
+    data["current_budget"] = copy.deepcopy(data["baseline_budget"])
+    data["rows"] = []
+    snapshot = copy.deepcopy(data["baseline_budget"])
+    snapshot["pending_reservations"]["old"]["status"] = "pending"
+    data["budget_events"] = [{"event_type": "budget_usage_update", "payload": {"totals": snapshot, "usage": {}}}]
+    validate_postactivation_accounting(**data)
+
+    data["current_budget"]["pending_reservations"]["old"]["status"] = "pending"
+    with pytest.raises(ValueError, match="reserves"):
+        validate_postactivation_accounting(**data)
+
+
+def test_changed_pending_cost_still_requires_reconciled_trace():
+    data = setup()
+    data["current_ledger"] = data["baseline_ledger"]
+    data["current_budget"] = copy.deepcopy(data["baseline_budget"])
+    data["current_budget"]["pending_cost_usd"] += 1e-13
+    data["rows"] = []
+    with pytest.raises(ValueError, match="trace required"):
+        validate_postactivation_accounting(**data)
+    data["budget_events"] = [{"event_type": "budget_usage_update", "payload": {"totals": {}}}]
+    with pytest.raises(ValueError, match="baseline is missing or ambiguous"):
+        validate_postactivation_accounting(**data)
+
+
 @pytest.mark.parametrize("mutation,match", [
     ("prefix", "prefix"), ("reserve", "reserves"), ("usage", "known usage"),
     ("config", "configuration"), ("missing", "dispatches"), ("unknown", "requires review"),
