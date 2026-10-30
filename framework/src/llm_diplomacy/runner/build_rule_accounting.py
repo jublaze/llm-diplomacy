@@ -63,8 +63,10 @@ def validate_postactivation_accounting(*, baseline_ledger: bytes, current_ledger
                 or results[0].get("prompt_hash") != dispatch.get("prompt_hash")):
             raise ValueError("post-activation provider outcome requires review")
         result = results[0]
-        if result.get("outcome") == "known_failed":
-            if (result.get("error_category") != "provider_transient_http" or request.get("error_type") != "ProviderHTTPError"
+        if result.get("outcome") in {"known_failed", "unknown"}:
+            expected_error = {"known_failed": ("provider_transient_http", "ProviderHTTPError"),
+                              "unknown": ("provider_timeout", "TimeoutError")}[result["outcome"]]
+            if ((result.get("error_category"), request.get("error_type")) != expected_error
                     or result.get("response") is not None or result.get("usage") is not None
                     or any(request.get(key) is not None for key in totals)):
                 raise ValueError("post-activation provider outcome requires review")

@@ -292,8 +292,6 @@ def test_received_response_is_journaled_before_parse_and_reused(tmp_path):
 def test_unresolved_dispatch_is_not_silently_reissued(tmp_path):
     recovery = ExperimentRecovery(tmp_path / "experiment", identity={"id": "a"}, resume=False)
     recovery.prepare()
-    recovery.record_dispatch(decision_id="game_001/1901_spring/once/agent_llm/submit_orders",
-                             prompt_hash="unused", attempt_id="old", provider={"provider_name": "mock"})
     class Spy(FakeLLMProvider):
         calls = 0
 
@@ -318,14 +316,19 @@ def test_unresolved_dispatch_is_not_silently_reissued(tmp_path):
     prompt_hash = __import__("hashlib").sha256(prompt.encode("utf-8")).hexdigest()
     decision_id = "/".join((context.game_id, context.phase_id, "once",
                             str(context.country_assignment or ""), context.agent_id, "submit_orders"))
+    recovery.record_prepared(decision_id=decision_id,
+                             prompt_hash=prompt_hash, attempt_id="pending", provider={"provider_name": "mock"})
     recovery.record_dispatch(decision_id=decision_id,
                              prompt_hash=prompt_hash, attempt_id="pending", provider={"provider_name": "mock"})
+    recovery.record_response(decision_id=decision_id, prompt_hash=prompt_hash, attempt_id="pending",
+                             provider={"provider_name": "mock"}, response=None, usage=None,
+                             error_category="provider_timeout", outcome="unknown")
     assert recovery.has_unresolved_dispatch(decision_id, prompt_hash)
     with pytest.raises(RuntimeError, match="unresolved provider dispatch"):
         runtime._invoke(method="submit_orders", context=context)
     assert provider.calls == 0
     recovery.resolve_unknown(decision_id=decision_id,
-                            attempt_id="pending", choice="retry_after_review")
+                            attempt_id="pending", prompt_hash=prompt_hash, choice="retry_after_review")
     runtime._invoke(method="submit_orders", context=context)
     assert provider.calls == 1
 

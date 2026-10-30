@@ -661,9 +661,12 @@ class BaselineLLMAgentRuntime(AgentRuntime):
             if cached is None and self.recovery is not None and self.recovery.attempt_count(decision_id) >= self.recovery.attempt_limit(decision_id, prompt_hash):
                 self.recovery.halt(reason="attempt_limit_exhausted", decision_id=decision_id)
                 raise RuntimeError("Recovery required: logical decision exhausted its request limit")
-            if cached is None and self.recovery is not None and self.recovery.has_unresolved_dispatch(decision_id, prompt_hash):
-                self.recovery.halt(reason="unknown_provider_outcome", decision_id=decision_id)
-                raise RuntimeError("Recovery required: unresolved provider dispatch needs an explicit decision")
+            if cached is None and self.recovery is not None:
+                try:
+                    self.recovery.assert_dispatch_allowed(decision_id=decision_id, prompt_hash=prompt_hash)
+                except RuntimeError:
+                    self.recovery.halt(reason="unknown_provider_outcome", decision_id=decision_id)
+                    raise
             dispatched = False
             if cached is not None:
                 row = cached.get("response") or {}

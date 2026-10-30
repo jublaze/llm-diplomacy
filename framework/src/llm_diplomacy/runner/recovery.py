@@ -16,7 +16,7 @@ RECOVERY_VERSION = 1
 _RUSSIA_ADJUSTMENT_DECISION = "game_001/1903_winter_adjustment/once/russia/birsan_ii/submit_orders"
 JOURNAL_KINDS = {
     "terminal_currency_accounting_upgrade_v1",
-    "known_http_accounting_upgrade_v1",
+    "known_http_accounting_upgrade_v1", "timeout_accounting_upgrade_v1",
     "build_rule_replay_transition_v1",
     "build_rule_replay_checkpoint_v1",
     "build_rule_boundary_adoption_v1",
@@ -1847,9 +1847,9 @@ class ExperimentRecovery:
 
     def _validate_build_rule_replay_checkpoint(self, entry: dict[str, Any], receipt: dict[str, Any],
                                                rows: list[dict[str, Any]]) -> None:
-        upgrades = [row for row in rows if row.get("kind") in {"known_http_accounting_upgrade_v1", "terminal_currency_accounting_upgrade_v1"}
+        upgrades = [row for row in rows if row.get("kind") in {"known_http_accounting_upgrade_v1", "terminal_currency_accounting_upgrade_v1", "timeout_accounting_upgrade_v1"}
                     and row.get("sequence", -1) < entry.get("sequence", -1)]
-        expected_identity = upgrades[0]["to_identity"] if len(upgrades) == 1 else receipt.get("to_identity")
+        expected_identity = upgrades[-1]["to_identity"] if upgrades else receipt.get("to_identity")
         if (entry.get("transition_sha256") != receipt.get("sha256")
                 or entry.get("identity") != expected_identity
                 or not isinstance(entry.get("state"), dict) or not isinstance(entry.get("applied"), list)):
@@ -2009,7 +2009,7 @@ class ExperimentRecovery:
                 or upgrade.get("source_journal_head") != rows[sequence - 1].get("sha256")
                 or upgrade.get("previous_hash") != upgrade.get("source_journal_head")
                 or upgrade.get("transition_sha256") != transition.get("sha256")
-                or before != transition.get("to_identity") or after != self.identity
+                or before != transition.get("to_identity")
                 or {k: v for k, v in before.items() if k != "code_sha256"}
                 != {k: v for k, v in after.items() if k != "code_sha256"}):
             raise ValueError("known HTTP upgrade identity or journal binding mismatch")
@@ -2020,9 +2020,13 @@ class ExperimentRecovery:
                   and "__pycache__" not in p.parts and p.suffix != ".pyc"}
         if (source != transition.get("target_code_manifest") or not isinstance(target, dict)
                 or canonical_hash(source) != before.get("code_sha256")
-                or canonical_hash(target) != after.get("code_sha256") or actual != target
+                or canonical_hash(target) != after.get("code_sha256")
                 or {key for key in set(source) | set(target) if source.get(key) != target.get(key)}
                 != {"runner/recovery.py", "runner/build_rule_accounting.py", "runner/known_http_reservations.py"}):
+            raise ValueError("known HTTP upgrade package binding mismatch")
+        if any(row.get("kind") == "timeout_accounting_upgrade_v1" for row in rows):
+            self._validate_timeout_accounting_upgrade(upgrade, rows, actual)
+        elif after != self.identity or actual != target:
             raise ValueError("known HTTP upgrade package binding mismatch")
         failure = upgrade.get("failure")
         attempts = [row for row in rows[:sequence] if row.get("kind") == "attempt"
@@ -2059,6 +2063,104 @@ class ExperimentRecovery:
                 raise ValueError("known HTTP accounting prefix changed")
         if _file_hash(self.path / "known-http-source-budget.json") != upgrade.get("source_budget_sha256"):
             raise ValueError("known HTTP source budget backup changed")
+
+    def _validate_timeout_accounting_upgrade(self, predecessor: dict[str, Any], rows: list[dict[str, Any]],
+                                             actual: dict[str, str]) -> None:
+        upgrades = [r for r in rows if r.get("kind") == "timeout_accounting_upgrade_v1"]
+        if len(upgrades) != 1:
+            raise ValueError("timeout upgrade missing or duplicated")
+        upgrade = upgrades[0]
+        sequence = upgrade.get("sequence")
+        before, after = upgrade.get("from_identity"), upgrade.get("to_identity")
+        source, target = upgrade.get("source_code_manifest"), upgrade.get("target_code_manifest")
+        if (not isinstance(sequence, int) or isinstance(sequence, bool) or not 0 < sequence < len(rows)
+                or not isinstance(predecessor.get("sequence"), int) or predecessor["sequence"] >= sequence
+                or upgrade.get("previous_hash") != rows[sequence - 1].get("sha256")
+                or upgrade.get("source_journal_count") != sequence
+                or upgrade.get("source_journal_head") != rows[sequence - 1].get("sha256")
+                or upgrade.get("http_upgrade_sha256") != predecessor.get("sha256")
+                or before != predecessor.get("to_identity") or after != self.identity
+                or {k: v for k, v in before.items() if k != "code_sha256"} != {k: v for k, v in after.items() if k != "code_sha256"}
+                or source != predecessor.get("target_code_manifest") or canonical_hash(source) != before.get("code_sha256")
+                or canonical_hash(target) != after.get("code_sha256") or actual != target
+                or not {k for k in set(source) | set(target) if source.get(k) != target.get(k)}
+                       <= {"runner/recovery.py", "runner/build_rule_accounting.py", "agents/baseline_llm_runtime.py", "population/runner.py", "runner/reservation_currency_trace.py"}):
+            raise ValueError("timeout upgrade identity or package mismatch")
+        failure = upgrade.get("failure", {})
+        originals = [r for r in rows[:sequence] if r.get("kind") == "attempt" and r.get("attempt_id") == failure.get("attempt_id")]
+        if (len(originals) != 1 or originals[0] != failure or failure.get("outcome") != "unknown"
+                or failure.get("error_category") != "provider_timeout" or failure.get("response") is not None
+                or failure.get("usage") is not None or any(r.get("kind") == "unknown_resolved"
+                    and r.get("attempt_id") == failure.get("attempt_id") for r in rows[:sequence])):
+            raise ValueError("timeout upgrade lacks exact unresolved timeout")
+        checkpoint = self.path / "timeout-source-checkpoint.json"
+        if _file_hash(checkpoint) != upgrade.get("source_checkpoint_sha256"):
+            raise ValueError("timeout source checkpoint changed")
+        cp = json.loads(checkpoint.read_bytes())
+        cp_hash = cp.pop("sha256")
+        anchor = cp.get("journal_anchor") or {}
+        count = anchor.get("count")
+        if (canonical_hash(cp) != cp_hash or cp.get("identity") != before or not cp.get("halt_required")
+                or cp.get("halt_reason") != "provider_timeout" or cp.get("decision_id") != failure.get("decision_id")
+                or not isinstance(count, int) or isinstance(count, bool) or not failure["sequence"] < count <= sequence
+                or rows[count - 1].get("sha256") != anchor.get("head")
+                or not any(r.get("kind") == "halt" and r.get("reason") == "provider_timeout"
+                           and r.get("decision_id") == failure.get("decision_id")
+                           and failure["sequence"] < r.get("sequence", -1) < sequence for r in rows)):
+            raise ValueError("timeout checkpoint mismatch")
+        if _file_hash(self.path / "timeout-source-budget.json") != upgrade.get("source_budget_sha256"):
+            raise ValueError("timeout source budget changed")
+        old_budget = json.loads((self.path / "timeout-source-budget.json").read_bytes())
+        current_budget = json.loads((self.root / "metrics/budget/budget_state.json").read_bytes())
+        original_reserves = old_budget.get("pending_reservations")
+        if (not isinstance(original_reserves, dict) or not isinstance(current_budget.get("pending_reservations"), dict)
+                or any(current_budget["pending_reservations"].get(k) != v for k, v in original_reserves.items())):
+            raise ValueError("timeout source reserves changed")
+        prefix = b"".join(self.journal_path.read_bytes().splitlines(keepends=True)[:sequence])
+        if hashlib.sha256(prefix).hexdigest() != upgrade.get("source_journal_sha256"):
+            raise ValueError("timeout source journal prefix changed")
+        for path, key in ((self.root / "metrics/provider_attempts.jsonl", "ledger"),
+                          (self.root / "metrics/budget/budget_events.jsonl", "budget_events")):
+            raw = path.read_bytes(); size = upgrade.get("source_" + key + "_bytes")
+            if (not isinstance(size, int) or isinstance(size, bool) or size < 0 or len(raw) < size
+                    or hashlib.sha256(raw[:size]).hexdigest() != upgrade.get("source_" + key + "_sha256")):
+                raise ValueError("timeout accounting prefix changed")
+
+    def authorize_timeout_accounting_upgrade(self, *, target_code_manifest: dict[str, str], attempt_id: str,
+                                            decision_id: str, prompt_hash: str) -> None:
+        """Record compatibility evidence without resolving or dispatching a request."""
+        with RecoveryLock(self.path / "writer.lock"):
+            rows = self._journal_rows()
+            predecessors = [r for r in rows if r.get("kind") == "known_http_accounting_upgrade_v1"]
+            failures = [r for r in rows if r.get("kind") == "attempt" and r.get("attempt_id") == attempt_id]
+            outstanding = self.in_flight()
+            if (len(predecessors) != 1 or len(failures) != 1 or len(outstanding) != 1
+                    or (outstanding[0].get("attempt_id"), outstanding[0].get("decision_id"), outstanding[0].get("prompt_hash"))
+                       != (attempt_id, decision_id, prompt_hash)
+                    or any(r.get("kind") == "timeout_accounting_upgrade_v1" for r in rows)
+                    or (self.path / "commit_manifest.json").exists()):
+                raise ValueError("timeout upgrade requires the exact sole unresolved attempt")
+            cp_copy = self.path / "timeout-source-checkpoint.json"
+            budget_copy = self.path / "timeout-source-budget.json"
+            if cp_copy.exists() or budget_copy.exists():
+                raise ValueError("timeout source backups already exist; review before retry")
+            _atomic_copy(self.checkpoint_path, cp_copy)
+            _atomic_copy(self.root / "metrics/budget/budget_state.json", budget_copy)
+            ledger = (self.root / "metrics/provider_attempts.jsonl").read_bytes()
+            events = (self.root / "metrics/budget/budget_events.jsonl").read_bytes()
+            previous = predecessors[0]
+            payload = {"kind": "timeout_accounting_upgrade_v1", "http_upgrade_sha256": previous["sha256"],
+                       "from_identity": previous["to_identity"], "to_identity": self.identity,
+                       "source_code_manifest": previous["target_code_manifest"], "target_code_manifest": target_code_manifest,
+                       "failure": failures[0], "source_journal_count": len(rows), "source_journal_head": rows[-1]["sha256"],
+                       "source_journal_sha256": hashlib.sha256(self.journal_path.read_bytes()).hexdigest(),
+                       "source_checkpoint_sha256": _file_hash(cp_copy), "source_budget_sha256": _file_hash(budget_copy),
+                       "source_ledger_bytes": len(ledger), "source_ledger_sha256": hashlib.sha256(ledger).hexdigest(),
+                       "source_budget_events_bytes": len(events), "source_budget_events_sha256": hashlib.sha256(events).hexdigest()}
+            provisional = {**payload, "sequence": len(rows), "previous_hash": rows[-1]["sha256"]}
+            provisional["sha256"] = canonical_hash(provisional)
+            self._validate_journal_semantics([*rows, provisional])
+            self._append(payload)
 
     def authorize_known_http_accounting_upgrade(self, *, target_code_manifest: dict[str, str],
                                                 attempt_id: str) -> None:
@@ -2228,8 +2330,26 @@ class ExperimentRecovery:
                 expected.update(halt_required=True, halt_reason=reason, decision_id=decision)
             if current != expected:
                 raise ValueError("build replay checkpoint differs from its durable receipt")
-        if self.in_flight() or (self.path / "commit_manifest.json").exists():
+        outstanding = self.in_flight()
+        if (self.path / "commit_manifest.json").exists():
             raise ValueError("build replay transition has unresolved work")
+        if outstanding:
+            if len(outstanding) != 1 or not activations:
+                raise ValueError("build replay transition has unresolved work")
+            item = outstanding[0]
+            attempt = item.get("attempt_id")
+            matches = [row for row in rows if row.get("attempt_id") == attempt]
+            prepared = [row for row in matches if row.get("kind") == "dispatch_prepared"]
+            dispatched = [row for row in matches if row.get("kind") == "dispatch"]
+            outcomes = [row for row in matches if row.get("kind") == "attempt"]
+            identity = (item.get("decision_id"), item.get("prompt_hash"))
+            if (len(prepared) != 1 or len(dispatched) != 1 or len(outcomes) != 1
+                    or any((row.get("decision_id"), row.get("prompt_hash")) != identity
+                           for row in (*prepared, *dispatched, *outcomes))
+                    or not (activations[0]["sequence"] < prepared[0]["sequence"] < dispatched[0]["sequence"] < outcomes[0]["sequence"])
+                    or outcomes[0].get("outcome") != "unknown" or outcomes[0].get("error_category") != "provider_timeout"
+                    or outcomes[0].get("response") is not None or outcomes[0].get("usage") is not None):
+                raise ValueError("build replay transition has unresolved work")
         self._validate_snapshot()
 
     def authorize_build_rule_replay(self, *, source_code_manifest: dict[str, str],
@@ -2470,6 +2590,11 @@ class ExperimentRecovery:
         corrections: dict[str, dict[str, Any]] = {}
         for row in rows:
             kind = row["kind"]
+            if kind == "timeout_accounting_upgrade_v1":
+                prior = rows[:row["sequence"]]
+                if (sum(item.get("kind") == "build_rule_replay_transition_v1" for item in prior) != 1
+                        or sum(item.get("kind") == "known_http_accounting_upgrade_v1" for item in prior) != 1):
+                    raise ValueError("timeout upgrade lacks its historical source chain")
             if kind == "build_rule_replay_transition_v1":
                 self._validate_build_rule_replay_transition(row, rows)
             if kind == "build_rule_replay_checkpoint_v1":
@@ -2621,13 +2746,99 @@ class ExperimentRecovery:
                 resolved.add(attempt_id)
         return bool(dispatched - resolved)
 
-    def resolve_unknown(self, *, decision_id: str, attempt_id: str, choice: str) -> None:
+    def assert_dispatch_allowed(self, *, decision_id: str, prompt_hash: str) -> None:
+        if self.in_flight():
+            raise RuntimeError("Recovery required: unresolved provider dispatch needs an explicit decision")
+        rows = self._journal_rows()
+        for index, row in enumerate(rows):
+            if row.get("kind") != "unknown_resolved" or row.get("choice") != "retry_after_review":
+                continue
+            later = rows[index + 1:]
+            replacements = [item for item in later if item.get("kind") == "dispatch_prepared"
+                            and item.get("decision_id") == row.get("decision_id")]
+            recovered = any(item.get("kind") == "attempt" and item.get("attempt_id") == row.get("attempt_id")
+                            and item.get("outcome") == "received" for item in later)
+            if recovered and replacements:
+                raise RuntimeError("Recovery required: original and replacement both have evidence")
+            if recovered:
+                continue
+            if replacements:
+                replacement = replacements[-1]
+                if decision_id == row.get("decision_id"):
+                    permitted = any(item.get("attempt_id") == replacement.get("attempt_id")
+                                    and item.get("kind") in {"unknown_resolved", "response_skipped"}
+                                    and item.get("choice") == "retry_after_review"
+                                    and item.get("prompt_hash") == prompt_hash
+                                    and (item.get("kind") == "unknown_resolved" or (
+                                        any(p.get("kind") == "attempt" and p.get("attempt_id") == replacement.get("attempt_id")
+                                            and p.get("outcome") == "received" for p in later[:later.index(item)])
+                                        and [v for v in later[:later.index(item)] if v.get("kind") == "response_validation"
+                                             and v.get("attempt_id") == replacement.get("attempt_id")][-1:]
+                                            == [v for v in later[:later.index(item)] if v.get("kind") == "response_validation"
+                                                and v.get("attempt_id") == replacement.get("attempt_id")
+                                                and v.get("decision_id") == decision_id
+                                                and v.get("prompt_hash") == replacement.get("prompt_hash")
+                                                and v.get("valid") is False][-1:]
+                                        and any(v.get("kind") == "response_validation" and v.get("attempt_id") == replacement.get("attempt_id")
+                                                for v in later[:later.index(item)]))) for item in later)
+                    intents = [item for item in later if item.get("kind") in {"repeat_correction_intent", "order_correction_intent"}
+                               and item.get("decision_id") == decision_id
+                               and item.get("parent_attempt_id") == replacement.get("attempt_id")
+                               and item.get("correction_prompt_hash") == prompt_hash]
+                    if len(intents) == 1 and rows.index(intents[0]) > rows.index(replacement):
+                        intent = intents[0]
+                        if any(item.get("kind") == "response_validation" and item.get("attempt_id") == replacement.get("attempt_id")
+                               for item in rows[rows.index(intent) + 1:]):
+                            raise RuntimeError("Recovery required: correction parent validation changed")
+                        if intent.get("kind") == "repeat_correction_intent":
+                            self._validate_repeat_correction(intent, rows)
+                            permitted = True
+                        else:
+                            parent = [item for item in rows[:rows.index(intent)] if item.get("kind") == "attempt"
+                                      and item.get("attempt_id") == replacement.get("attempt_id")
+                                      and item.get("decision_id") == decision_id and item.get("outcome") == "received"]
+                            validations = [item for item in rows[:rows.index(intent)] if item.get("kind") == "response_validation"
+                                           and item.get("attempt_id") == replacement.get("attempt_id")
+                                           and item.get("decision_id") == decision_id and item.get("valid") is False]
+                            if (len(parent) == 1 and len(validations) == 1
+                                    and intent.get("base_prompt_hash") == replacement.get("prompt_hash")
+                                    and parent[0].get("prompt_hash") == replacement.get("prompt_hash")
+                                    and validations[0].get("prompt_hash") == replacement.get("prompt_hash")
+                                    and canonical_hash(parent[0].get("response")) == intent.get("parent_response_hash")
+                                    and canonical_hash(validations[0]) == intent.get("parent_validation_hash")
+                                    and isinstance(intent.get("feedback"), dict)
+                                    and isinstance(validations[0].get("issue"), str) and bool(validations[0]["issue"])
+                                    and intent["feedback"].get("rejected_answer") == (parent[0].get("response") or {}).get("content")
+                                    and (intent["feedback"].get("validator_issue") == validations[0].get("issue")
+                                         or intent["feedback"].get("runtime_error") == validations[0].get("issue"))
+                                    and canonical_hash(intent["feedback"]) == intent.get("feedback_hash")):
+                                permitted = True
+                    if not permitted:
+                        raise RuntimeError("Recovery required: replacement authorization is already consumed")
+                continue
+            if (decision_id, prompt_hash) != (row.get("decision_id"), row.get("prompt_hash")):
+                raise RuntimeError("Recovery required: the authorized replacement must be dispatched first")
+
+    def resolve_unknown(self, *, decision_id: str, attempt_id: str, choice: str, prompt_hash: str | None = None) -> None:
         if choice not in {"retry_after_review", "abandon_decision"}:
             raise ValueError("unknown outcome choice must be retry_after_review or abandon_decision")
         pending = next((row for row in self.in_flight()
                         if row.get("decision_id") == decision_id and row.get("attempt_id") == attempt_id), None)
-        if pending is None:
+        if pending is None or not prompt_hash or pending.get("prompt_hash") != prompt_hash:
             raise ValueError("unknown dispatch does not match an unresolved attempt")
+        if len(self.in_flight()) != 1:
+            raise ValueError("unknown decision requires exactly one unresolved attempt")
+        rows = self._journal_rows()
+        related = [row for row in rows if row.get("attempt_id") == attempt_id]
+        prepared = [row for row in related if row.get("kind") == "dispatch_prepared"]
+        dispatched = [row for row in related if row.get("kind") == "dispatch"]
+        outcomes = [row for row in related if row.get("kind") == "attempt"]
+        if (len(prepared) != 1 or len(dispatched) != 1 or len(outcomes) != 1
+                or outcomes[0].get("outcome") != "unknown"
+                or any((row.get("decision_id"), row.get("prompt_hash")) != (decision_id, prompt_hash)
+                       for row in (*prepared, *dispatched, *outcomes))
+                or not (rows.index(prepared[0]) < rows.index(dispatched[0]) < rows.index(outcomes[0]))):
+            raise ValueError("unknown decision requires a recorded unresolved provider outcome")
         self._append({"kind": "unknown_resolved", "decision_id": decision_id,
                       "prompt_hash": pending["prompt_hash"], "attempt_id": attempt_id, "choice": choice})
 

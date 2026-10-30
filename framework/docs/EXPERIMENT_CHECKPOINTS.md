@@ -14,8 +14,10 @@ python scripts/run_population_experiment.py --config path/to/config.yaml --outpu
 After reviewing the failure, resume explicitly. If a request was dispatched but no response was durably received, status reports its logical decision and attempt IDs. Prefer exact-original retrieval and validation. The CLI supports the following replacement action, but it requires separate authorization accepting a possible duplicate charge; a monitor's original-only policy does not permit it:
 
 ```powershell
-python scripts/run_population_experiment.py --config path/to/config.yaml --output-root . --agents-root experiments/my-run/agents --resume --decision-action retry_unknown --decision-id <decision-id> --attempt-id <attempt-id>
+python scripts/run_population_experiment.py --config path/to/config.yaml --output-root . --agents-root experiments/my-run/agents --resume --decision-action retry_unknown --decision-id <decision-id> --attempt-id <attempt-id> --prompt-hash <original-prompt-hash>
 ```
+
+The recovery action binds the original decision, attempt and prompt. A pending unknown blocks every fresh dispatch; cached replay remains available. Once a replacement is prepared, its authorization cannot be reused. Inspect the journal and in-flight state after interruption before taking another action.
 
 `abandon_unknown` permanently abandons that logical decision. It does not substitute orders, continue past the halted phase, or remove the uncertain budget reservation. For a received-invalid response outside automatic correction, an authorized `retry_invalid` action binds the exact decision, rejected attempt and actual prompt hash (`--prompt-hash`). Do not repeat a consumed action or regenerate an accepted decision. Resume without a decision is allowed when no unresolved external request or rejected response requires a choice. The default three-request limit includes earlier dispatches and unresolved prepared requests; opt-in repeat corrections and exact historical exceptions are described in [provider recovery](PROVIDER_RECOVERY.md).
 

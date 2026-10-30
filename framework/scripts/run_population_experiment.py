@@ -30,7 +30,7 @@ def main() -> int:
                         help="Reviewed decision for one pending or rejected logical request.")
     parser.add_argument("--decision-id", help="Logical decision ID shown by --status.")
     parser.add_argument("--attempt-id", help="Attempt ID shown by --status.")
-    parser.add_argument("--prompt-hash", help="Required with retry_invalid; hash shown in status/journal.")
+    parser.add_argument("--prompt-hash", help="Required with a recovery decision; hash shown in status/journal.")
     args = parser.parse_args()
 
     cfg = load_population_experiment_config(args.config)

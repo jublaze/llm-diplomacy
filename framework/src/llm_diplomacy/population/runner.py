@@ -124,8 +124,10 @@ class PopulationExperimentRunner:
                 if not resume or not decision_id or not attempt_id:
                     raise ValueError("a recovery decision requires --resume, --decision-id and --attempt-id")
                 if decision_action in {"retry_unknown", "abandon_unknown"}:
+                    if not prompt_hash:
+                        raise ValueError("unknown recovery requires the original prompt hash")
                     recovery.resolve_unknown(
-                        decision_id=decision_id, attempt_id=attempt_id,
+                        decision_id=decision_id, attempt_id=attempt_id, prompt_hash=prompt_hash,
                         choice="retry_after_review" if decision_action == "retry_unknown" else "abandon_decision",
                     )
                 elif decision_action == "retry_invalid":

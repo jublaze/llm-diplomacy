@@ -43,6 +43,39 @@ def test_known_failure_preserves_reserved_exposure():
     validate_postactivation_accounting(**failure_data())
 
 
+def timeout_data():
+    data = failure_data()
+    data["rows"][-1].update(outcome="unknown", error_category="provider_timeout")
+    request = json.loads(data["current_ledger"].splitlines()[-1])
+    request["error_type"] = "TimeoutError"
+    data["current_ledger"] = data["baseline_ledger"] + (json.dumps(request) + "\n").encode()
+    return data
+
+
+def test_timeout_remains_unknown_with_reserved_exposure():
+    data = timeout_data()
+    before = copy.deepcopy(data)
+    validate_postactivation_accounting(**data)
+    assert data == before
+
+
+@pytest.mark.parametrize("mutation", ["category", "error", "response", "usage", "hash", "reserve", "settlement", "duplicate"])
+def test_timeout_evidence_must_match(mutation):
+    data = timeout_data()
+    if mutation == "category": data["rows"][-1]["error_category"] = "provider_network"
+    if mutation == "error":
+        request = json.loads(data["current_ledger"].splitlines()[-1])
+        request["error_type"] = "ProviderHTTPError"
+        data["current_ledger"] = data["baseline_ledger"] + (json.dumps(request) + "\n").encode()
+    if mutation == "response": data["rows"][-1]["response"] = {}
+    if mutation == "usage": data["rows"][-1]["usage"] = {}
+    if mutation == "hash": data["rows"][-1]["prompt_hash"] = "wrong"
+    if mutation == "reserve": del data["current_budget"]["pending_reservations"]["r"]
+    if mutation == "settlement": data["budget_events"].pop()
+    if mutation == "duplicate": data["budget_events"].append(copy.deepcopy(data["budget_events"][0]))
+    with pytest.raises(ValueError): validate_postactivation_accounting(**data)
+
+
 def test_received_retry_keeps_the_failed_attempt_reserve():
     data = failure_data()
     success = setup()
