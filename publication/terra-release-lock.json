@@ -1,0 +1,17 @@
+{
+  "policy_version": "diplomacy_terra_postgame_release_v1",
+  "games": {
+    "g1": {
+      "report_sha256": "d8f48ac29488e0520ce88bcb7657aa30125181c0413c1a7fb33ef8bf29e2c827",
+      "receipt_sha256": "bb852b2c8d1640f80483ff17110e38d19176baad4f40427823d9b9d3bbdfe165"
+    },
+    "g2": {
+      "report_sha256": "8120fa146178fc3114ed7a0c710f167e47e2f96f0509cf8dc8cb663394c28c2b",
+      "receipt_sha256": "ffc6d9cc0a6cb046d649eee43c9c5214966c9f36e98e8bf103dc5d7020feb0e4"
+    }
+  },
+  "asset_name": "terra-two-game-full-postgame-v1.zip",
+  "release_tag": "terra-two-game-full-postgame-v1",
+  "asset_sha256": "8325b5c41cc99c689c44889969c6c8824b261d34b9bda0421ce24503651c3856",
+  "asset_bytes": 2167095
+}

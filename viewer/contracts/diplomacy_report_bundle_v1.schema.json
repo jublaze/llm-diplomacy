@@ -173,7 +173,8 @@
         "policy_version": {
           "enum": [
             "diplomacy_audience_policy_v1",
-            "diplomacy_full_postgame_release_v1"
+            "diplomacy_full_postgame_release_v1",
+            "diplomacy_terra_postgame_release_v1"
           ]
         },
         "mode": {
