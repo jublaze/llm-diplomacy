@@ -1,4 +1,4 @@
-name: Reviewed full Luna postgame Pages release
+name: Reviewed completed postgame Pages collection
 on:
   workflow_dispatch:
 permissions: {}
@@ -27,25 +27,35 @@ jobs:
         run: gh release download luna1912-full-postgame-v1 --pattern luna1912-full-postgame-v1.zip --dir "$RUNNER_TEMP/luna-asset"
       - name: Check pinned checksum and extract exact members
         run: python publication/release_asset.py extract --asset "$RUNNER_TEMP/luna-asset/luna1912-full-postgame-v1.zip" --data-root "$RUNNER_TEMP/luna-data" --lock publication/luna-release-lock.json
+      - name: Fetch and verify the separately reviewed Terra dataset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release download terra-two-game-full-postgame-v1 --pattern terra-two-game-full-postgame-v1.zip --dir "$RUNNER_TEMP/terra-asset"
+          python publication/terra_asset.py extract --asset "$RUNNER_TEMP/terra-asset/terra-two-game-full-postgame-v1.zip" --data-root "$RUNNER_TEMP/terra-data" --lock publication/terra-release-lock.json
       - run: npm ci --ignore-scripts
         working-directory: viewer
-      - name: Validate, stage and build actual Luna data
+      - name: Validate, stage and build the completed collection
         working-directory: viewer
         env:
           LUNA_RELEASE_DATA: ${{ runner.temp }}/luna-data
+          TERRA_RELEASE_DATA: ${{ runner.temp }}/terra-data
           PUBLIC_BASE_PATH: /${{ github.event.repository.name }}/
           PUBLIC_BUILD_INPUT_ROOT: full-postgame-input
           PUBLIC_BUILD_OUTPUT_ROOT: dist-full-postgame
         run: |
           npm test
           npm run test:full-postgame
+          npx --no-install vitest run tests/terra-policy.test.ts
           python -m unittest discover -s ../publication -p test_full_postgame.py
+          python -m unittest discover -s ../publication -p test_terra_postgame.py
           npm run typecheck
-          node --experimental-strip-types scripts/full_postgame_build.ts stage "$RUNNER_TEMP/luna-data" full-postgame-input
-          node --experimental-strip-types scripts/full_postgame_build.ts verify-stage full-postgame-input
+          node --experimental-strip-types scripts/collection_postgame_build.ts stage "$RUNNER_TEMP/luna-data" "$RUNNER_TEMP/terra-data" full-postgame-input
+          node --experimental-strip-types scripts/collection_postgame_build.ts verify-stage full-postgame-input
           npx --no-install vite build --mode public
           touch dist-full-postgame/.nojekyll
-          node --experimental-strip-types scripts/full_postgame_build.ts verify-build dist-full-postgame
+          node --experimental-strip-types scripts/collection_postgame_build.ts verify-build dist-full-postgame
       - uses: actions/upload-pages-artifact@v4
         with:
           path: viewer/dist-full-postgame

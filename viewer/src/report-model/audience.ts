@@ -6,7 +6,7 @@ export type BundleAudienceMode = 'omniscient_research' | 'postgame_public' | 'fu
 
 export type BundleAudienceMetadata = {
   schema_version: typeof AUDIENCE_METADATA_SCHEMA;
-  policy_version: typeof AUDIENCE_POLICY_VERSION | 'diplomacy_full_postgame_release_v1' | 'legacy_unversioned';
+  policy_version: typeof AUDIENCE_POLICY_VERSION | 'diplomacy_full_postgame_release_v1' | 'diplomacy_terra_postgame_release_v1' | 'legacy_unversioned';
   mode: BundleAudienceMode;
   reader_description: string;
   approved_for_static_public_distribution: boolean;
@@ -30,6 +30,20 @@ export function resolveBundleAudience(bundle: Pick<DiplomacyReportBundleV1, 'ext
   }
   if (!object(raw)) throw new Error('extensions.audience must be an object');
   if (raw.schema_version !== AUDIENCE_METADATA_SCHEMA) throw new Error(`unsupported audience metadata schema ${JSON.stringify(raw.schema_version)}`);
+  if (raw.policy_version === 'diplomacy_terra_postgame_release_v1') {
+    const candidate = bundle as Record<string, any>;
+    const sources: Record<string, string> = {
+      'terra61-1028-g1': 'aa1e43c7d00eda2e8fbb587deaed4550a17a0dd947459725cb69ef0a3c5a80f4',
+      'terra61-1028-g2': 'd34ccccdf664c1127069664e64688875f81ea0034d8e1dc4ecb2ac95f3edfd76',
+    };
+    if (raw.mode !== 'full_postgame_public' || raw.approved_for_static_public_distribution !== true
+      || typeof raw.reader_description !== 'string' || !raw.reader_description.trim()
+      || !object(raw.projection) || raw.projection.generator !== 'publication/terra_postgame.py'
+      || !object(candidate.source) || !Object.hasOwn(sources, candidate.source.experiment_id)
+      || raw.projection.source_bundle_sha256 !== sources[candidate.source.experiment_id]
+      || raw.projection.source_bundle_id !== candidate.bundle_id) throw new Error('Invalid Terra full-postgame release provenance');
+    return { ...raw, legacy_inference: false } as BundleAudienceMetadata;
+  }
   if (raw.policy_version === 'diplomacy_full_postgame_release_v1') {
     if (raw.mode !== 'full_postgame_public' || raw.approved_for_static_public_distribution !== true
       || typeof raw.reader_description !== 'string' || !raw.reader_description.trim()

@@ -28,6 +28,7 @@ export type BuildReportCatalogOptions = {
   force?: boolean;
   approvedNarrativeRoot?: string;
   requirePublicSafe?: boolean;
+  experimentCatalogIds?: boolean;
 };
 
 const inside = (parent: string, child: string) => {
@@ -70,7 +71,8 @@ export function buildReportCatalog(options: BuildReportCatalogOptions): ReportCa
     const semanticErrors = validateBundle(report);
     if (semanticErrors.length) throw new Error(`${path}: semantic validation failed: ${semanticErrors.join('; ')}`);
     if (options.requirePublicSafe && !isStaticPublicBundle(report)) throw new Error(`${path}: public-safe catalog refuses a legacy or omniscient_research bundle.`);
-    const id = report.source.game_id as string;
+    const id = options.experimentCatalogIds && report.source.experiment_id !== 'luna1912-1018-r2'
+      ? `${report.source.experiment_id}--${report.source.game_id}` : report.source.game_id as string;
     const releasedArtifacts = Array.from(new Set(Object.values(report.evidence_index ?? {})
       .filter((source: any) => source.release_context === 'postgame_released_negotiation_transcript')
       .map((source: any) => source.artifact_path as string)))
@@ -83,7 +85,9 @@ export function buildReportCatalog(options: BuildReportCatalogOptions): ReportCa
         return { artifactPath, artifact };
       });
     const sha256 = createHash('sha256').update(bytes).digest('hex');
-    return { path, bytes, id, report, releasedArtifacts, entry: catalogEntryFromReport(id, report, { fixture: options.fixture, sha256 }), narrativePath: undefined as string | undefined };
+    const entry = catalogEntryFromReport(id, report, { fixture: options.fixture, sha256 });
+    if (options.experimentCatalogIds) entry.label = report.source.experiment_id === 'luna1912-1018-r2' ? 'Luna 1912' : report.game.title;
+    return { path, bytes, id, report, releasedArtifacts, entry, narrativePath: undefined as string | undefined };
   }).sort((left, right) => left.id.localeCompare(right.id));
 
   if (options.approvedNarrativeRoot) {
