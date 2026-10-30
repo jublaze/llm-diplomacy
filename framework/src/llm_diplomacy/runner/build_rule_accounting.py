@@ -46,14 +46,24 @@ def validate_postactivation_accounting(*, baseline_ledger: bytes, current_ledger
     imports = verified_imports or {}
     extra_import_outcomes = sum(1 for item in imports.values() if item['received'])
     missing = [d for d in dispatches if not any(o.get('attempt_id') == d.get('attempt_id') for o in outcomes)]
-    if (len(missing) > 1 or (missing and missing[0] != dispatches[-1])
-            or len(prepared) != len(dispatches) or len(outcomes) + len(missing) != len(dispatches) + extra_import_outcomes):
+    if (len(prepared) != len(dispatches) or len(outcomes) + len(missing) != len(dispatches) + extra_import_outcomes):
         raise ValueError("post-activation prepared, dispatch and response records do not match")
+    for missing_dispatch in missing:
+        later = [row for row in dispatches if row['sequence'] > missing_dispatch['sequence']]
+        if later and ((later[0].get('decision_id'), later[0].get('prompt_hash')) !=
+                (missing_dispatch.get('decision_id'), missing_dispatch.get('prompt_hash')) or not any(row.get('kind') == 'unknown_resolved'
+                and row.get('attempt_id') == missing_dispatch.get('attempt_id')
+                and row.get('decision_id') == missing_dispatch.get('decision_id')
+                and row.get('prompt_hash') == missing_dispatch.get('prompt_hash')
+                and row.get('choice') == 'retry_after_review'
+                and missing_dispatch['sequence'] < row.get('sequence', -1) < later[0]['sequence'] for row in rows)):
+            raise ValueError('unresolved dispatch precedes a later request')
     if len({row.get("attempt_id") for row in dispatches}) != len(dispatches):
         raise ValueError("post-activation dispatch identities are duplicated")
     totals = {"input_tokens": 0, "output_tokens": 0, "estimated_cost_usd": 0.0}
     effective_requests = list(requests)
     failures = []
+    charged_missing = False
     for index, (request, dispatch) in enumerate(zip(requests, dispatches)):
         parts = dispatch.get("decision_id", "").split("/")
         if len(parts) != 6 or any(request.get(key) != value for key, value in
@@ -62,10 +72,15 @@ def validate_postactivation_accounting(*, baseline_ledger: bytes, current_ledger
         results = [row for row in rows if row.get("kind") == "attempt" and row.get("attempt_id") == dispatch.get("attempt_id")]
         starts = [row for row in prepared if row.get("attempt_id") == dispatch.get("attempt_id")]
         if not results:
-            if request.get('error_type') != 'TimeoutError' or any(request.get(key) is not None for key in totals):
-                raise ValueError('unrecorded outcome requires retained unknown request evidence')
-            results = [{**dispatch, 'sequence': dispatch['sequence'] + .5, 'outcome': 'unknown',
-                        'error_category': 'provider_timeout', 'response': None, 'usage': None}]
+            if request.get('error_type') == 'TimeoutError' and all(request.get(key) is None for key in totals):
+                results = [{**dispatch, 'sequence': dispatch['sequence'] + .5, 'outcome': 'unknown',
+                            'error_category': 'provider_timeout', 'response': None, 'usage': None}]
+            elif request.get('error_type') is None:
+                charged_missing = True
+                results = [{**dispatch, 'sequence': dispatch['sequence'] + .5, 'outcome': 'accounted_unknown',
+                            'response': None, 'usage': {key: request.get(key) for key in totals}}]
+            else:
+                raise ValueError('unrecorded outcome requires exact request accounting')
         imported = imports.get(dispatch.get("attempt_id"))
         if imported and imported['settled']:
             if (request.get('error_type') != 'TimeoutError' or any(request.get(key) is not None for key in totals)
@@ -98,7 +113,7 @@ def validate_postactivation_accounting(*, baseline_ledger: bytes, current_ledger
                              "identity": {"game_id": parts[0], "phase_id": parts[1], "agent_id": parts[4], "method": parts[5]},
                              "started_at": starts[0]["started_at"], "next_started_at": next_start})
             continue
-        if request.get("error_type") or result.get("outcome") != "received":
+        if request.get("error_type") or result.get("outcome") not in {"received", "accounted_unknown"}:
             raise ValueError("post-activation provider outcome requires review")
         usage = results[0].get("usage")
         if not isinstance(usage, dict):
@@ -114,7 +129,14 @@ def validate_postactivation_accounting(*, baseline_ledger: bytes, current_ledger
                 raise ValueError("post-activation journal usage differs from ledger")
             totals[key] += value
     from .known_http_reservations import match_http_reservations
-    match_http_reservations(failures, additional_reserves, budget_events or [])
+    retained = match_http_reservations(failures, additional_reserves, budget_events or [])
+    if charged_missing:
+        if not budget_events:
+            raise ValueError('charged missing outcome requires a complete reservation trace')
+        from .reservation_currency_trace import verify_pending_currency_trace
+        verify_pending_currency_trace(baseline_budget, current_budget, budget_events, effective_requests,
+            imported_reservations={item['observation']['reservation_id'] for item in imports.values() if item['settled']},
+            retained_reservations=set(retained.values()))
     reserve_increments = {"input_tokens": 0, "output_tokens": 0, "estimated_cost_usd": 0.0}
     for reserve in additional_reserves.values():
         for key, field in (("input_tokens", "input_tokens"), ("output_tokens", "output_tokens"),

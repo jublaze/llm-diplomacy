@@ -2,7 +2,7 @@
 import math
 
 
-def verify_pending_currency_trace(baseline, current, events, requests, *, imported_reservations=()):
+def verify_pending_currency_trace(baseline, current, events, requests, *, imported_reservations=(), retained_reservations=()):
     keys = ("total_provider_calls", "pending_reservations", "pending_input_tokens", "pending_output_tokens",
             "pending_cost_usd", "known_input_tokens", "known_output_tokens", "known_estimated_cost_usd",
             "budget_admission_estimated_input_tokens", "budget_admission_estimated_output_tokens",
@@ -72,10 +72,13 @@ def verify_pending_currency_trace(baseline, current, events, requests, *, import
             calls += 1
             active = key
         elif kind == "provider_reservation_uncertain":
-            if (active is None or active not in imported_reservations
+            if (active is None or active not in imported_reservations and active not in retained_reservations
                     or payload != {"reservation_id": active} or pending[active].get("status") != "pending"):
                 raise ValueError("unexpected uncertain reservation trace")
             pending[active]["status"] = "uncertain"
+            if active in retained_reservations:
+                active = None
+                offset += 1
         elif kind == "budget_usage_update":
             if active is None:
                 raise ValueError("reservation trace usage lacks its reservation")
@@ -106,5 +109,9 @@ def verify_pending_currency_trace(baseline, current, events, requests, *, import
     if (active is not None or offset != len(requests) or pending != current.get("pending_reservations")
             or in_tokens != current.get("pending_input_tokens") or out_tokens != current.get("pending_output_tokens")
             or cost != current.get("pending_cost_usd") or calls != current.get("total_provider_calls")
-            or any(totals.get(key) != current.get(key) for key in keys)):
+            or known_in != current.get("known_input_tokens") or known_out != current.get("known_output_tokens")
+            or known_cost != current.get("known_estimated_cost_usd")
+            or known_in + in_tokens != current.get("budget_admission_estimated_input_tokens")
+            or known_out + out_tokens != current.get("budget_admission_estimated_output_tokens")
+            or known_cost + cost != current.get("budget_admission_estimated_cost_usd")):
         raise ValueError("reservation trace does not reconcile final budget")
