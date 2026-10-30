@@ -6,7 +6,7 @@ export type BundleAudienceMode = 'omniscient_research' | 'postgame_public' | 'fu
 
 export type BundleAudienceMetadata = {
   schema_version: typeof AUDIENCE_METADATA_SCHEMA;
-  policy_version: typeof AUDIENCE_POLICY_VERSION | 'diplomacy_full_postgame_release_v1' | 'diplomacy_terra_postgame_release_v1' | 'legacy_unversioned';
+  policy_version: typeof AUDIENCE_POLICY_VERSION | 'diplomacy_full_postgame_release_v1' | 'diplomacy_terra_postgame_release_v1' | 'diplomacy_luna_successor_postgame_release_v1' | 'legacy_unversioned';
   mode: BundleAudienceMode;
   reader_description: string;
   approved_for_static_public_distribution: boolean;
@@ -42,6 +42,16 @@ export function resolveBundleAudience(bundle: Pick<DiplomacyReportBundleV1, 'ext
       || !object(candidate.source) || !Object.hasOwn(sources, candidate.source.experiment_id)
       || raw.projection.source_bundle_sha256 !== sources[candidate.source.experiment_id]
       || raw.projection.source_bundle_id !== candidate.bundle_id) throw new Error('Invalid Terra full-postgame release provenance');
+    return { ...raw, legacy_inference: false } as BundleAudienceMetadata;
+  }
+  if (raw.policy_version === 'diplomacy_luna_successor_postgame_release_v1') {
+    const candidate = bundle as Record<string, any>;
+    if (raw.mode !== 'full_postgame_public' || raw.approved_for_static_public_distribution !== true
+      || typeof raw.reader_description !== 'string' || !raw.reader_description.trim()
+      || !object(raw.projection) || raw.projection.generator !== 'publication/luna_successor_postgame.py'
+      || !object(candidate.source) || candidate.source.experiment_id !== 'luna1912-memory-1028-plan'
+      || raw.projection.source_bundle_sha256 !== 'ed894823f8ca74b81586b494bdb805708082273de825eb2efd572e7280f6eab6'
+      || raw.projection.source_bundle_id !== candidate.bundle_id) throw new Error('Invalid Luna successor release provenance');
     return { ...raw, legacy_inference: false } as BundleAudienceMetadata;
   }
   if (raw.policy_version === 'diplomacy_full_postgame_release_v1') {
