@@ -12,7 +12,8 @@ from typing import Any
 def validate_postactivation_accounting(*, baseline_ledger: bytes, current_ledger: bytes,
         baseline_budget: dict[str, Any], current_budget: dict[str, Any],
         rows: list[dict[str, Any]], activation_sequence: int,
-        budget_events: list[dict[str, Any]] | None = None) -> None:
+        budget_events: list[dict[str, Any]] | None = None,
+        verified_imports: dict[str, Any] | None = None) -> None:
     if not current_ledger.startswith(baseline_ledger) or (baseline_ledger and not baseline_ledger.endswith(b"\n")):
         raise ValueError("provider ledger prefix changed")
     static = ("schema_version", "experiment_id", "config_fingerprint", "max_provider_calls",
@@ -42,11 +43,16 @@ def validate_postactivation_accounting(*, baseline_ledger: bytes, current_ledger
     outcomes = [row for row in rows if row.get("kind") == "attempt" and row.get("sequence", -1) > activation_sequence]
     if len(requests) != len(dispatches):
         raise ValueError("post-activation requests do not match durable dispatches")
-    if len(prepared) != len(dispatches) or len(outcomes) != len(dispatches):
+    imports = verified_imports or {}
+    extra_import_outcomes = sum(1 for item in imports.values() if item['received'])
+    missing = [d for d in dispatches if not any(o.get('attempt_id') == d.get('attempt_id') for o in outcomes)]
+    if (len(missing) > 1 or (missing and missing[0] != dispatches[-1])
+            or len(prepared) != len(dispatches) or len(outcomes) + len(missing) != len(dispatches) + extra_import_outcomes):
         raise ValueError("post-activation prepared, dispatch and response records do not match")
     if len({row.get("attempt_id") for row in dispatches}) != len(dispatches):
         raise ValueError("post-activation dispatch identities are duplicated")
     totals = {"input_tokens": 0, "output_tokens": 0, "estimated_cost_usd": 0.0}
+    effective_requests = list(requests)
     failures = []
     for index, (request, dispatch) in enumerate(zip(requests, dispatches)):
         parts = dispatch.get("decision_id", "").split("/")
@@ -55,6 +61,20 @@ def validate_postactivation_accounting(*, baseline_ledger: bytes, current_ledger
             raise ValueError("post-activation request and dispatch identity mismatch")
         results = [row for row in rows if row.get("kind") == "attempt" and row.get("attempt_id") == dispatch.get("attempt_id")]
         starts = [row for row in prepared if row.get("attempt_id") == dispatch.get("attempt_id")]
+        if not results:
+            if request.get('error_type') != 'TimeoutError' or any(request.get(key) is not None for key in totals):
+                raise ValueError('unrecorded outcome requires retained unknown request evidence')
+            results = [{**dispatch, 'sequence': dispatch['sequence'] + .5, 'outcome': 'unknown',
+                        'error_category': 'provider_timeout', 'response': None, 'usage': None}]
+        imported = imports.get(dispatch.get("attempt_id"))
+        if imported and imported['settled']:
+            if (request.get('error_type') != 'TimeoutError' or any(request.get(key) is not None for key in totals)
+                    or not results or results[0].get('outcome') != 'unknown'):
+                raise ValueError('provider import does not match the original request')
+            observation = imported['observation']
+            results = [{**results[0], 'outcome': 'received', 'usage': observation['usage']}]
+            request = {**request, 'error_type': None, **{key: observation['usage'][key] for key in totals}}
+            effective_requests[index] = request
         if (len(results) != 1 or len(starts) != 1 or starts[0].get("decision_id") != dispatch.get("decision_id")
                 or starts[0].get("prompt_hash") != dispatch.get("prompt_hash")
                 or not (activation_sequence < starts[0].get("sequence", -1) < dispatch.get("sequence", -1)
@@ -66,7 +86,9 @@ def validate_postactivation_accounting(*, baseline_ledger: bytes, current_ledger
         if result.get("outcome") in {"known_failed", "unknown"}:
             expected_error = {"known_failed": ("provider_transient_http", "ProviderHTTPError"),
                               "unknown": ("provider_timeout", "TimeoutError")}[result["outcome"]]
-            if ((result.get("error_category"), request.get("error_type")) != expected_error
+            if (((result.get("error_category"), request.get("error_type")) != expected_error
+                    and not (result.get("outcome") == "unknown" and result.get("error_category") == "process_interrupted"
+                             and request.get("error_type") == "TimeoutError"))
                     or result.get("response") is not None or result.get("usage") is not None
                     or any(request.get(key) is not None for key in totals)):
                 raise ValueError("post-activation provider outcome requires review")
@@ -114,7 +136,8 @@ def validate_postactivation_accounting(*, baseline_ledger: bytes, current_ledger
             if not budget_events:
                 raise ValueError("reservation trace required for changed pending cost")
             from .reservation_currency_trace import verify_pending_currency_trace
-            verify_pending_currency_trace(baseline_budget, current_budget, budget_events, requests)
+            verify_pending_currency_trace(baseline_budget, current_budget, budget_events, effective_requests,
+                imported_reservations={item['observation']['reservation_id'] for item in imports.values() if item['settled']})
     if current_budget.get("total_provider_calls") != baseline_budget.get("total_provider_calls", -1) + len(requests):
         raise ValueError("post-activation provider call count differs from budget")
     for key, increment in totals.items():
@@ -127,6 +150,9 @@ def validate_postactivation_accounting(*, baseline_ledger: bytes, current_ledger
         if old_total is None or additional_reserves:
             if new_total is not None:
                 raise ValueError("uncertain historical total was cleared")
+        elif new_total is None and any(item['settled'] for item in imports.values()):
+            # A verified import settles its reserve before reconciling previously unknown totals.
+            pass
         elif (isinstance(old_total, bool) or not isinstance(old_total, (int, float))
               or isinstance(new_total, bool) or not isinstance(new_total, (int, float))
               or not math.isfinite(old_total) or not math.isfinite(new_total)

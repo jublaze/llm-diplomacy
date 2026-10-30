@@ -15,6 +15,7 @@ from typing import Any
 RECOVERY_VERSION = 1
 _RUSSIA_ADJUSTMENT_DECISION = "game_001/1903_winter_adjustment/once/russia/birsan_ii/submit_orders"
 JOURNAL_KINDS = {
+    "provider_import_intent_v1", "provider_import_settlement_v1",
     "terminal_currency_accounting_upgrade_v1",
     "known_http_accounting_upgrade_v1", "timeout_accounting_upgrade_v1",
     "build_rule_replay_transition_v1",
@@ -460,11 +461,26 @@ class ExperimentRecovery:
                 self.needs_bootstrap = True
             if not (self.path / "initial_snapshot").exists() and not self.attempt_count_total():
                 self.needs_bootstrap = True
+            anchor = (checkpoint.get("journal_anchor") or {}).get("count")
+            if (build_transition is not None and isinstance(anchor, int) and 0 < anchor <= len(rows)
+                    and checkpoint.get("cursor", {}).get("unit") in {"game_completed", "population_reports_completed"}
+                    and not (self.path / "commit_manifest.json").exists()):
+                terminal = rows[anchor - 1]
+                manifest = terminal.get("terminal_manifest") if terminal.get("kind") == "build_rule_replay_checkpoint_v1" else None
+                if (isinstance(manifest, dict) and not any(row.get("kind") == "commit_completed"
+                        and row.get("transaction_id") == manifest.get("transaction_id")
+                        and row.get("sequence", -1) > terminal.get("sequence", -1) for row in rows)):
+                    self._validate_build_rule_replay_checkpoint(terminal, build_transition, rows)
+                    self._append({"kind": "commit_completed", "transaction_id": manifest["transaction_id"]})
+                    rows = self._journal_rows()
             if rows:
                 atomic_json(self.journal_head_path,
                             {"sequence": len(rows) - 1, "sha256": rows[-1]["sha256"]})
-            if (build_selector is not None and activation is not None and checkpoint.get("cursor", {}).get("unit")
-                    in {"game_completed", "population_reports_completed"}):
+            if (build_selector is not None and activation is not None and
+                    (checkpoint.get("cursor", {}).get("unit") in {"game_completed", "population_reports_completed"}
+                     or ((self.path / "commit_manifest.json").exists() and any(
+                         row.get("kind") == "build_rule_boundary_validation_v1"
+                         and row.get("sequence", -1) > activation["sequence"] for row in rows)))):
                 build_selector._boundary_crossed = True
             self.build_rule_replay_selector = build_selector
             return checkpoint
@@ -548,10 +564,18 @@ class ExperimentRecovery:
             return None
         manifest = self.validate_pending_commit(canonical_root=canonical_root)
         manifest.pop("sha256", None)
+        if any(row.get("kind") == "commit_completed" and row.get("transaction_id") == manifest["transaction_id"]
+               for row in self._journal_rows()):
+            checkpoint = self._read_checkpoint()
+            if (checkpoint is None or any(checkpoint.get(k) != manifest[k] for k in ("cursor", "state", "applied"))
+                    or any(_file_hash(canonical_root / Path(row["path"])) != row["after"] for row in manifest["entries"])):
+                raise ValueError("completed transaction differs from its checkpoint or files")
+            manifest_path.unlink()
+            return manifest
         self._apply_commit(manifest, canonical_root=canonical_root)
         self.checkpoint(cursor=manifest["cursor"], state=manifest["state"], applied=manifest["applied"])
-        manifest_path.unlink()
         self._append({"kind": "commit_completed", "transaction_id": manifest["transaction_id"]})
+        manifest_path.unlink()
         return manifest
 
     def validate_pending_commit(self, *, canonical_root: Path) -> dict[str, Any]:
@@ -1878,6 +1902,19 @@ class ExperimentRecovery:
                 try:
                     if json.loads(pending.read_bytes()) != manifest:
                         raise ValueError("terminal replay checkpoint commit manifest differs")
+                except FileNotFoundError:
+                    entries = manifest.get("entries")
+                    if not isinstance(entries, list):
+                        raise ValueError("terminal commit evidence has invalid entries")
+                    seen = set()
+                    for item in entries:
+                        name = item.get("path") if isinstance(item, dict) else None
+                        path = Path(name) if isinstance(name, str) else None
+                        if (path is None or path.is_absolute() or ".." in path.parts or name in seen
+                                or item.get("delete") is not False or not isinstance(item.get("after"), str)
+                                or _file_hash(self.root / path) != item["after"]):
+                            raise ValueError("terminal commit evidence does not match canonical files")
+                        seen.add(name)
                 except (OSError, json.JSONDecodeError) as exc:
                     raise ValueError("terminal replay checkpoint lacks pending or completed commit") from exc
             return
@@ -2332,7 +2369,9 @@ class ExperimentRecovery:
                 raise ValueError("build replay checkpoint differs from its durable receipt")
         outstanding = self.in_flight()
         if (self.path / "commit_manifest.json").exists():
-            raise ValueError("build replay transition has unresolved work")
+            if not activations or outstanding:
+                raise ValueError("build replay transition has unresolved work")
+            self.validate_pending_commit(canonical_root=self.root)
         if outstanding:
             if len(outstanding) != 1 or not activations:
                 raise ValueError("build replay transition has unresolved work")
@@ -2343,12 +2382,13 @@ class ExperimentRecovery:
             dispatched = [row for row in matches if row.get("kind") == "dispatch"]
             outcomes = [row for row in matches if row.get("kind") == "attempt"]
             identity = (item.get("decision_id"), item.get("prompt_hash"))
-            if (len(prepared) != 1 or len(dispatched) != 1 or len(outcomes) != 1
+            if (len(prepared) != 1 or len(dispatched) != 1 or len(outcomes) > 1
                     or any((row.get("decision_id"), row.get("prompt_hash")) != identity
                            for row in (*prepared, *dispatched, *outcomes))
-                    or not (activations[0]["sequence"] < prepared[0]["sequence"] < dispatched[0]["sequence"] < outcomes[0]["sequence"])
-                    or outcomes[0].get("outcome") != "unknown" or outcomes[0].get("error_category") != "provider_timeout"
-                    or outcomes[0].get("response") is not None or outcomes[0].get("usage") is not None):
+                    or not (activations[0]["sequence"] < prepared[0]["sequence"] < dispatched[0]["sequence"])
+                    or (outcomes and (dispatched[0]["sequence"] >= outcomes[0]["sequence"]
+                        or outcomes[0].get("outcome") != "unknown" or outcomes[0].get("error_category") not in {"provider_timeout", "process_interrupted"}
+                        or outcomes[0].get("response") is not None or outcomes[0].get("usage") is not None))):
                 raise ValueError("build replay transition has unresolved work")
         self._validate_snapshot()
 
@@ -2511,9 +2551,11 @@ class ExperimentRecovery:
                              if events_path.exists() else [])
         except (OSError, ValueError) as exc:
             raise ValueError("build rule activation accounting is unreadable") from exc
+        from .provider_import_intents import verified_imports
+        imports = verified_imports(self.path, self.journal_path, current_ledger, current_budget, rows, budget_events)
         validate_postactivation_accounting(baseline_ledger=baseline_ledger, current_ledger=current_ledger,
             baseline_budget=baseline_budget, current_budget=current_budget, rows=rows,
-            activation_sequence=activation["sequence"], budget_events=budget_events)
+            activation_sequence=activation["sequence"], budget_events=budget_events, verified_imports=imports)
 
     def _validate_build_rule_boundary_validation(self, validation: dict[str, Any], transition: dict[str, Any],
             adoption: dict[str, Any], activation: dict[str, Any], rows: list[dict[str, Any]]) -> None:
@@ -2833,11 +2875,12 @@ class ExperimentRecovery:
         prepared = [row for row in related if row.get("kind") == "dispatch_prepared"]
         dispatched = [row for row in related if row.get("kind") == "dispatch"]
         outcomes = [row for row in related if row.get("kind") == "attempt"]
-        if (len(prepared) != 1 or len(dispatched) != 1 or len(outcomes) != 1
-                or outcomes[0].get("outcome") != "unknown"
+        if (len(prepared) != 1 or len(dispatched) != 1 or len(outcomes) > 1
+                or (outcomes and outcomes[0].get("outcome") != "unknown")
                 or any((row.get("decision_id"), row.get("prompt_hash")) != (decision_id, prompt_hash)
                        for row in (*prepared, *dispatched, *outcomes))
-                or not (rows.index(prepared[0]) < rows.index(dispatched[0]) < rows.index(outcomes[0]))):
+                or not (rows.index(prepared[0]) < rows.index(dispatched[0]))
+                or (outcomes and rows.index(dispatched[0]) >= rows.index(outcomes[0]))):
             raise ValueError("unknown decision requires a recorded unresolved provider outcome")
         self._append({"kind": "unknown_resolved", "decision_id": decision_id,
                       "prompt_hash": pending["prompt_hash"], "attempt_id": attempt_id, "choice": choice})

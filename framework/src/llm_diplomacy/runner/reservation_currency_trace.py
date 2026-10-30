@@ -2,14 +2,37 @@
 import math
 
 
-def verify_pending_currency_trace(baseline, current, events, requests):
+def verify_pending_currency_trace(baseline, current, events, requests, *, imported_reservations=()):
     keys = ("total_provider_calls", "pending_reservations", "pending_input_tokens", "pending_output_tokens",
             "pending_cost_usd", "known_input_tokens", "known_output_tokens", "known_estimated_cost_usd",
             "budget_admission_estimated_input_tokens", "budget_admission_estimated_output_tokens",
             "budget_admission_estimated_cost_usd")
-    matches = [i for i, e in enumerate(events) if e.get("event_type") == "budget_usage_update"
-               and isinstance(e.get("payload", {}).get("totals"), dict)
-               and all(e["payload"]["totals"].get(k) == baseline.get(k) for k in keys)]
+    def matches_baseline(event):
+        payload = event.get("payload", {})
+        totals = payload.get("totals") if isinstance(payload, dict) else None
+        if (event.get("event_type") != "budget_usage_update" or event.get("experiment_id") != baseline.get("experiment_id")
+                or not isinstance(totals, dict)):
+            return False
+        if all(totals.get(k) == baseline.get(k) for k in keys):
+            return True
+        if any(totals.get(k) != baseline.get(k) for k in keys if k != "pending_reservations"):
+            return False
+        old, saved, usage = totals.get("pending_reservations"), baseline.get("pending_reservations"), payload.get("usage")
+        if not isinstance(old, dict) or not isinstance(saved, dict) or not isinstance(usage, dict) or old.keys() != saved.keys():
+            return False
+        changed = [key for key in old if old[key] != saved[key]]
+        if len(changed) != 1:
+            return False
+        before, after = old[changed[0]], saved[changed[0]]
+        if not isinstance(before, dict) or not isinstance(after, dict):
+            return False
+        if before.get("status") != "pending" or after != {**before, "status": "uncertain"}:
+            return False
+        if any(before.get(k) != payload.get(k) for k in ("game_id", "phase_id", "agent_id", "method")):
+            return False
+        return any(usage.get(k) is None for k in ("prompt_tokens", "completion_tokens", "estimated_cost_usd"))
+
+    matches = [i for i, event in enumerate(events) if matches_baseline(event)]
     if len(matches) != 1:
         raise ValueError("reservation trace baseline is missing or ambiguous")
     pending = {k: dict(v) for k, v in baseline["pending_reservations"].items()}
@@ -48,6 +71,11 @@ def verify_pending_currency_trace(baseline, current, events, requests):
             cost += value
             calls += 1
             active = key
+        elif kind == "provider_reservation_uncertain":
+            if (active is None or active not in imported_reservations
+                    or payload != {"reservation_id": active} or pending[active].get("status") != "pending"):
+                raise ValueError("unexpected uncertain reservation trace")
+            pending[active]["status"] = "uncertain"
         elif kind == "budget_usage_update":
             if active is None:
                 raise ValueError("reservation trace usage lacks its reservation")

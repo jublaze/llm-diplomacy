@@ -46,12 +46,20 @@ def test_authorization_binds_next_dispatch_and_is_not_reusable():
         store.assert_dispatch_allowed(decision_id="decision", prompt_hash="hash")
 
 
-@pytest.mark.parametrize("remove", [1, 2])
-def test_cannot_resolve_a_prepared_or_unrecorded_outcome(remove):
+def test_cannot_resolve_a_prepared_without_dispatch():
     store, rows = recovery()
-    rows.pop(remove)
+    rows.pop(1)
     with pytest.raises(ValueError):
         store.resolve_unknown(decision_id="decision", attempt_id="original", prompt_hash="hash", choice="retry_after_review")
+
+
+@pytest.mark.parametrize("choice", ["retry_after_review", "abandon_decision"])
+def test_explicit_decision_can_resolve_dispatched_attempt_without_outcome(choice):
+    store, rows = recovery()
+    rows.pop()
+    store.resolve_unknown(decision_id="decision", attempt_id="original", prompt_hash="hash", choice=choice)
+    assert rows[-1]["kind"] == "unknown_resolved" and rows[-1]["choice"] == choice
+    assert not store.in_flight()
 
 
 def test_failed_replacement_does_not_reuse_authorization():
