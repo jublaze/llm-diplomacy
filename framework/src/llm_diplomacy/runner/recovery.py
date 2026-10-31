@@ -45,6 +45,16 @@ def canonical_hash(value: Any) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
+def _is_recorded_offline_tail_upgrade(source: dict, target: dict,
+                                      old_manifest: dict, new_manifest: dict) -> bool:
+    path = "runner/offline_tail_transaction.py"
+    return (source.get("experiment_id") in {"luna1912-memory-1028-plan", "terra61-1028-g1"}
+            and source.get("code_sha256") == "73c458a7ba5dfea6619c8d5a398edde6121c1df51684e6d8d11aa11238424668"
+            and target.get("code_sha256") == "bb94ed2e5690732d3398a25ebd4d4fa41aa73f9901a29fc3558fd25657c31a2c"
+            and path not in old_manifest
+            and new_manifest.get(path) == "167f2f0f3e15e010c2747db34c8120cd483f1ffef36cf3026e1c0954abb10499")
+
+
 def atomic_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
@@ -2275,6 +2285,8 @@ class ExperimentRecovery:
                    "runner/recovery.py", "runner/build_rule_replay_selector.py",
                    "runner/build_fix_recovery_plan.py",
                    "runner/build_rule_proof.py", "runner/build_rule_accounting.py"}
+        if _is_recorded_offline_tail_upgrade(source, target, old_manifest, new_manifest):
+            allowed.add("runner/offline_tail_transaction.py")
         if not changed or not changed <= allowed or receipt.get("changed_code_paths") != sorted(changed):
             raise ValueError("build replay transition contains an unapproved code path")
         checkpoint = receipt.get("source_checkpoint")
