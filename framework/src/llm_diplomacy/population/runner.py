@@ -162,6 +162,14 @@ class PopulationExperimentRunner:
                 agents_relative = self.agents_root.resolve().relative_to(experiment_root.resolve())
             except ValueError as exc:
                 raise ValueError("strict recovery requires --agents-root inside the experiment directory") from exc
+            if (not resume or recovery.needs_bootstrap) and self.config.agent_state_mode == "reuse" and self.agents_root.exists():
+                # Capture inherited folios in the initial staged snapshot, rather
+                # than preparing fresh agents after switching to the empty stage.
+                source = self.agents_root
+                if any(p.is_symlink() or getattr(p, "is_junction", lambda: False)()
+                       for p in [source, *source.parents, *source.rglob("*")]):
+                    raise ValueError("strict reuse folios may not contain links")
+                shutil.copytree(source, staged_experiment_root / agents_relative)
             self.agents_root = staged_experiment_root / agents_relative
             if not resume and (staged_experiment_root / "dry_run_report.json").exists():
                 (staged_experiment_root / "dry_run_report.json").unlink()
