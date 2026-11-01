@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { centerCounts, defaultPhase, findPhase, messageWindow, phaseLabel, phases, phasesForYear, powerSummaries, searchReport, threadGroups, type EvidenceTarget, type Report, type SearchCategory } from '../viewer-model';
 import { MapAnalysis } from '../map/MapAnalysis';
+import { CampaignReader } from './CampaignReader';
+import { loadCampaignStory, type CampaignStory } from '../campaign-story';
 import { loadCatalog, loadCatalogNarrative, loadCatalogReport, readerTitle, type AppInitialData, type FetchLike, type ReportCatalogEntry, type ReportCatalogV1 } from '../report-loader';
 import type { HistorianNarrativeV1 } from '../narrative-model';
 import type { ReportAudience } from '../audience-projection';
@@ -15,10 +17,10 @@ const powerColors: Record<string, string> = { austria: '#9e4f72', england: '#495
 const points: Record<string, [number, number]> = { ank:[82,68], bel:[36,42], ber:[49,35], bre:[28,47], bud:[58,53], bul:[71,62], con:[77,66], den:[48,28], edi:[31,19], gre:[65,67], hol:[42,35], kie:[45,32], lon:[32,31], lvp:[25,27], mar:[35,58], mos:[77,38], mun:[45,47], nap:[52,69], nwy:[43,16], par:[34,45], por:[19,60], rom:[49,65], rum:[66,57], ser:[60,60], sev:[82,53], smy:[81,73], spa:[25,61], stp:[74,21], swe:[56,19], tri:[54,55], tun:[39,76], ven:[49,57], vie:[54,49], war:[65,39] };
 
 type Drawer = EvidenceTarget | null;
-type View = 'home' | 'phase' | 'search' | 'threads' | 'powers' | 'arcs' | 'comparison';
+type View = 'home' | 'phase' | 'search' | 'threads' | 'powers' | 'arcs' | 'comparison' | 'story' | 'library';
 type Route = { game: string | null; view: View; phase: string | null; evidence: Drawer; power: string | null; compare?: string[] };
 type Citation = { label: string; evidence_type: 'public' | 'message' | 'private_record' | 'postgame'; target: EvidenceTarget };
-const validViews = new Set<View>(['home', 'phase', 'search', 'threads', 'powers', 'arcs', 'comparison']);
+const validViews = new Set<View>(['home', 'phase', 'search', 'threads', 'powers', 'arcs', 'comparison', 'story', 'library']);
 const validEvidenceTypes = new Set<EvidenceTarget['type']>(['message', 'source', 'record', 'order']);
 
 function parseEvidence(value: string | null): Drawer {
@@ -34,6 +36,7 @@ function hashState(catalog: ReportCatalogV1): Route {
   return { game: game && catalog.reports.some((entry) => entry.id === game) ? game : null, view, phase, evidence: parseEvidence(hash.get('evidence')), power: hash.get('power'), compare };
 }
 function routeHash(route: Route): string {
+  if (route.view === 'story' || route.view === 'library') return `#view=${route.view}`;
   if (route.view === 'comparison') { const params = new URLSearchParams({ view: 'comparison' }); if (route.compare?.length) params.set('games', route.compare.join(',')); return `#${params.toString()}`; }
   if (!route.game) return ''; const params = new URLSearchParams({ game: route.game });
   if (route.view !== 'phase') params.set('view', route.view);
@@ -189,6 +192,9 @@ export function App({ initialData, catalogUrl = `${import.meta.env.BASE_URL}repo
 }
 
 function CatalogApp({ catalog, catalogUrl, initialReports, fetcher }: { catalog: ReportCatalogV1; catalogUrl: string; initialReports: Record<string, Report>; fetcher: FetchLike }) {
+  const [story,setStory]=useState<CampaignStory|null>(null); const [storyError,setStoryError]=useState<string|null>(null);
+  const storyLocation=useRef('#view=story');
+  useEffect(()=>{let cancelled=false;setStory(null);setStoryError(null);if(catalog.campaign_story)loadCampaignStory(catalog,catalogUrl,fetcher).then(value=>{if(!cancelled)setStory(value);}).catch(error=>{if(!cancelled)setStoryError(String(error));});return()=>{cancelled=true;};},[catalog,catalogUrl,fetcher]);
   const [route,setRoute]=useState<Route>(() => hashState(catalog)); const evidenceTrigger=useRef<HTMLElement | SVGElement | null>(null);
   const [reports, setReports] = useState<Record<string, Report>>(() => ({ ...initialReports }));
   const [loadError, setLoadError] = useState<string | null>(null); const [loadingGame, setLoadingGame] = useState<string | null>(null); const [retry, setRetry] = useState(0);
@@ -217,11 +223,16 @@ function CatalogApp({ catalog, catalogUrl, initialReports, fetcher }: { catalog:
     return () => { cancelled = true; };
   }, [catalog,catalogUrl,fetcher,narrativeErrors,narratives,reports,route.game]);
   const navigate=(next:Route)=>{setRoute(next); location.hash=routeHash(next);};
+  if (!route.game && catalog.campaign_story && (route.view==='home'||route.view==='story')) {
+    if (storyError) return <LoadState eyebrow="Campaign story" title="Story unavailable" message={storyError} error onLibrary={()=>navigate({game:null,view:'library',phase:null,evidence:null,power:null})}/>;
+    if (!story) return <LoadState eyebrow="Campaign story" title="Loading the campaign story…" message="Checking its evidence and report bindings." onLibrary={()=>navigate({game:null,view:'library',phase:null,evidence:null,power:null})}/>;
+    return <CampaignReader story={story} onLibrary={()=>{storyLocation.current=location.hash||'#view=story';navigate({game:null,view:'library',phase:null,evidence:null,power:null});}} onExplore={({game,phase,target,power})=>{storyLocation.current=location.hash||'#view=story';navigate({game,view:power?'powers':phase?'phase':'home',phase:phase??null,evidence:target??null,power:power??null});}}/>;
+  }
   if(route.view==='comparison') return <ComparisonRoute catalog={catalog} catalogUrl={catalogUrl} initialReports={reports} fetcher={fetcher} selectedIds={route.compare??[]} onSelection={(compare)=>navigate({game:null,view:'comparison',phase:null,evidence:null,power:null,compare})} onLibrary={()=>navigate({game:null,view:'home',phase:null,evidence:null,power:null})}/>;
-  if(!route.game) return <Library catalog={catalog} onCompare={()=>navigate({game:null,view:'comparison',phase:null,evidence:null,power:null,compare:catalog.reports.slice(0,2).map((entry)=>entry.id)})} onGame={(game)=>navigate({game,view:'home',phase:null,evidence:null,power:null})}/>;
+  if(!route.game) return <>{story&&<nav className="story-return"><button onClick={()=>{location.hash=storyLocation.current;setRoute(hashState(catalog));}}>← Return to the story</button></nav>}<Library catalog={catalog} onCompare={()=>navigate({game:null,view:'comparison',phase:null,evidence:null,power:null,compare:catalog.reports.slice(0,2).map((entry)=>entry.id)})} onGame={(game)=>navigate({game,view:'home',phase:null,evidence:null,power:null})}/></>;
   if (loadError) return <LoadState eyebrow="Report load error" title="Unable to load selected report" message={loadError} error onRetry={() => setRetry((value) => value + 1)} onLibrary={() => navigate({game:null,view:'home',phase:null,evidence:null,power:null})}/>;
   if (!report || loadingGame === route.game) return <LoadState eyebrow="Completed campaign" title="Loading selected report…" message={`Fetching ${catalog.reports.find((entry) => entry.id === route.game)?.label ?? route.game}.`}/>;
-  const gameId=route.game; const entry=catalog.reports.find((candidate)=>candidate.id===gameId)!; const sourceGameId=entry.source_game_id??entry.id; const perspectives=catalog.reports.filter((candidate)=>candidate.experiment_id===entry.experiment_id && (candidate.source_game_id??candidate.id)===sourceGameId).sort((a,b)=>a.audience.localeCompare(b.audience)); const header=<ExplorerHeader entry={entry} report={report} perspectives={perspectives} onPerspective={(id)=>navigate({game:id,view:'home',phase:null,evidence:null,power:null})} onLibrary={()=>navigate({game:null,view:'home',phase:null,evidence:null,power:null})} onHome={()=>navigate({game:gameId,view:'home',phase:null,evidence:null,power:null})} onSearch={()=>navigate({game:gameId,view:'search',phase:null,evidence:null,power:null})} onThreads={()=>navigate({game:gameId,view:'threads',phase:null,evidence:null,power:null})} onPowers={()=>navigate({game:gameId,view:'powers',phase:null,evidence:null,power:null})} onArcs={()=>navigate({game:gameId,view:'arcs',phase:null,evidence:null,power:null})}/>;
+  const gameId=route.game; const entry=catalog.reports.find((candidate)=>candidate.id===gameId)!; const sourceGameId=entry.source_game_id??entry.id; const perspectives=catalog.reports.filter((candidate)=>candidate.experiment_id===entry.experiment_id && (candidate.source_game_id??candidate.id)===sourceGameId&&candidate.experiment_id===entry.experiment_id).sort((a,b)=>a.audience.localeCompare(b.audience)); const header=<ExplorerHeader entry={entry} report={report} perspectives={perspectives} onPerspective={(id)=>navigate({game:id,view:'home',phase:null,evidence:null,power:null})} onLibrary={()=>navigate({game:null,view:'home',phase:null,evidence:null,power:null})} onHome={()=>navigate({game:gameId,view:'home',phase:null,evidence:null,power:null})} onSearch={()=>navigate({game:gameId,view:'search',phase:null,evidence:null,power:null})} onThreads={()=>navigate({game:gameId,view:'threads',phase:null,evidence:null,power:null})} onPowers={()=>navigate({game:gameId,view:'powers',phase:null,evidence:null,power:null})} onArcs={()=>navigate({game:gameId,view:'arcs',phase:null,evidence:null,power:null})}/>;
   const goPhase=(phase:string)=>navigate({game:gameId,view:'phase',phase,evidence:null,power:null});
   const goPower=(power:string)=>navigate({game:gameId,view:'powers',phase:null,evidence:null,power});
   const goThreads=(power?:string)=>navigate({game:gameId,view:'threads',phase:null,evidence:null,power:power??null});
@@ -234,5 +245,5 @@ function CatalogApp({ catalog, catalogUrl, initialReports, fetcher }: { catalog:
   else if(route.view==='powers') content=<PowerView report={report} header={header} selectedPower={route.power} onThreads={goThreads} onOpenEvidence={openEvidence}/>;
   else if(route.view==='arcs') content=<ArcView report={report} header={header} onOpenEvidence={openEvidence} onPower={goPower}/>;
   else content=<GameHome report={report} narrative={narratives[gameId]} onPhase={goPhase} onSearch={()=>navigate({game:gameId,view:'search',phase:null,evidence:null,power:null})} onThreads={goThreads} onPowers={()=>navigate({game:gameId,view:'powers',phase:null,evidence:null,power:null})} onArcs={()=>navigate({game:gameId,view:'arcs',phase:null,evidence:null,power:null})} onOpenEvidence={openEvidence} header={header}/>;
-  return <>{loadingNarrative===gameId&&<aside className="load-state narrative-notice" role="status">Loading approved narrative overlay…</aside>}{narrativeErrors[gameId]&&<aside className="load-state narrative-notice" role="status"><b>Narrative overlay unavailable.</b> The factual report remains available. {narrativeErrors[gameId]}</aside>}{content}<EvidenceDrawer drawer={route.evidence} report={report} phaseId={contextPhase} returnFocus={evidenceTrigger} onClose={closeEvidence}/></>;
+  return <>{story&&<nav className="story-return"><button onClick={()=>{location.hash=storyLocation.current;setRoute(hashState(catalog));}}>← Return to the story</button></nav>}{loadingNarrative===gameId&&<aside className="load-state narrative-notice" role="status">Loading approved narrative overlay…</aside>}{narrativeErrors[gameId]&&<aside className="load-state narrative-notice" role="status"><b>Narrative overlay unavailable.</b> The factual report remains available. {narrativeErrors[gameId]}</aside>}{content}<EvidenceDrawer drawer={route.evidence} report={report} phaseId={contextPhase} returnFocus={evidenceTrigger} onClose={closeEvidence}/></>;
 }

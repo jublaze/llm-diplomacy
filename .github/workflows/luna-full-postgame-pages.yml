@@ -41,6 +41,13 @@ jobs:
         run: |
           gh release download luna-successor-full-postgame-v1 --pattern luna-successor-full-postgame-v1.zip --dir "$RUNNER_TEMP/luna-successor-asset"
           python publication/luna_successor_asset.py extract --asset "$RUNNER_TEMP/luna-successor-asset/luna-successor-full-postgame-v1.zip" --data-root "$RUNNER_TEMP/luna-successor-data" --lock publication/luna-successor-release-lock.json
+      - name: Fetch the reviewed campaign narratives
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release download campaign-story-v1 --pattern campaign-story-v1.zip --dir "$RUNNER_TEMP/story-asset"
+          python publication/campaign_asset.py --asset "$RUNNER_TEMP/story-asset/campaign-story-v1.zip" --output "$RUNNER_TEMP/story-data" --lock publication/campaign-story-release-lock.json
       - run: npm ci --ignore-scripts
         working-directory: viewer
       - name: Validate, stage and build the completed collection
@@ -59,8 +66,10 @@ jobs:
           python -m unittest discover -s ../publication -p test_full_postgame.py
           python -m unittest discover -s ../publication -p test_terra_postgame.py
           python -m unittest discover -s ../publication -p test_luna_successor_postgame.py
+          npx --no-install vitest run tests/campaign-story.test.tsx
+          python -m unittest discover -s ../publication -p test_campaign_asset.py
           npm run typecheck
-          node --experimental-strip-types scripts/collection_postgame_build.ts stage "$RUNNER_TEMP/luna-data" "$RUNNER_TEMP/terra-data" "$RUNNER_TEMP/luna-successor-data" full-postgame-input
+          node --experimental-strip-types scripts/collection_postgame_build.ts stage "$RUNNER_TEMP/luna-data" "$RUNNER_TEMP/terra-data" "$RUNNER_TEMP/luna-successor-data" full-postgame-input "$RUNNER_TEMP/story-data"
           node --experimental-strip-types scripts/collection_postgame_build.ts verify-stage full-postgame-input
           npx --no-install vite build --mode public
           touch dist-full-postgame/.nojekyll

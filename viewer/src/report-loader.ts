@@ -4,6 +4,7 @@ import { validateHistorianNarrative, validateHistorianNarrativeSchema, type Hist
 import { isReportAudience, type ReportAudience } from './audience-projection.ts';
 import { resolveBundleAudience, type BundleAudienceMode } from './report-model/audience.ts';
 import type { Report } from './viewer-model.ts';
+import type { CampaignStoryReference } from './campaign-story.ts';
 
 export const REPORT_CATALOG_SCHEMA = 'diplomacy_report_catalog_v1' as const;
 
@@ -41,6 +42,7 @@ export type NarrativeCatalogReference = {
 export type ReportCatalogV1 = {
   schema_version: typeof REPORT_CATALOG_SCHEMA;
   reports: ReportCatalogEntry[];
+  campaign_story?: CampaignStoryReference;
 };
 
 export type AppInitialData = {
@@ -128,6 +130,10 @@ export function validateCatalog(value: unknown): ReportCatalogV1 {
     throw new ReportLoadError(`Unsupported catalog schema ${JSON.stringify(value.schema_version)}; expected ${REPORT_CATALOG_SCHEMA}.`);
   }
   if (!Array.isArray(value.reports)) throw new ReportLoadError('Report catalog reports must be an array.');
+  if (value.campaign_story !== undefined) {
+    const story = value.campaign_story;
+    if (!isObject(story) || !safeRelativeUrl(story.story_url) || typeof story.sha256 !== 'string' || !/^[a-f\d]{64}$/.test(story.sha256) || story.audience !== 'omniscient_postgame') throw new ReportLoadError('Invalid campaign story reference.');
+  }
   const ids = new Set<string>();
   for (const [index, candidate] of value.reports.entries()) {
     if (!isObject(candidate)) throw new ReportLoadError(`Catalog report ${index} must be an object.`);
@@ -171,6 +177,7 @@ export function validateCatalog(value: unknown): ReportCatalogV1 {
       if (candidate.narrative.audience !== candidate.audience) throw new ReportLoadError(`Catalog report ${candidate.id} narrative audience does not match report audience.`);
     }
   }
+  if (value.campaign_story && value.reports.some(candidate => candidate.audience !== 'omniscient_postgame' || !((candidate.audience_mode === 'omniscient_research' && candidate.approved_for_static_public_distribution === false) || ((value.campaign_story as CampaignStoryReference | undefined)?.publication_policy === 'diplomacy_campaign_story_release_v1' && candidate.audience_mode === 'full_postgame_public' && candidate.approved_for_static_public_distribution === true)))) throw new ReportLoadError('Campaign stories require a local full-postgame research catalog.');
   return value as unknown as ReportCatalogV1;
 }
 

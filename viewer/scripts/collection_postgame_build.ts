@@ -13,6 +13,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const publication = resolve(root, '../publication');
 const terraLock = JSON.parse(readFileSync(join(publication, 'terra-release-lock.json'), 'utf8'));
 const successorLock = JSON.parse(readFileSync(join(publication, 'luna-successor-release-lock.json'), 'utf8'));
+const storyLock = JSON.parse(readFileSync(join(publication, 'campaign-story-release-lock.json'), 'utf8'));
 const lunaLock = JSON.parse(readFileSync(join(publication, 'luna-release-lock.json'), 'utf8'));
 const sha = (b: Buffer) => createHash('sha256').update(b).digest('hex');
 const files = (d: string): string[] => readdirSync(d, { withFileTypes: true }).sort((a,b)=>a.name.localeCompare(b.name)).flatMap(x=>{
@@ -29,7 +30,7 @@ function verifyTerra(game: 'g1' | 'g2', dir: string) {
   if(errors.length || resolveBundleAudience(report).mode!=='full_postgame_public') throw new Error(`Terra ${game} validation failed: ${errors.join('; ')}`);
 }
 
-export function stage(luna: string, terra: string, successor: string, output: string) {
+export function stage(luna: string, terra: string, successor: string, output: string, story?: string) {
   const destination = resolve(output);
   for (const input of [luna, terra, successor]) {
     const source = resolve(input);
@@ -54,6 +55,14 @@ export function stage(luna: string, terra: string, successor: string, output: st
   for(const name of ['credits.html','THIRD_PARTY_NOTICES.json']) cpSync(join(publication,name),join(output,name));
   mkdirSync(join(output,'release-receipts'));
   for(const [name,dir] of [['luna',luna],['g1',join(terra,'g1')],['g2',join(terra,'g2')],['successor',join(successor,'g2')]]) cpSync(join(dir,'release-receipt.json'),join(output,'release-receipts',`${name}.json`));
+  if (story) {
+    const bytes=readFileSync(join(story,'story.json'));
+    if(sha(bytes)!==storyLock.story_sha256) throw new Error('Unreviewed campaign story');
+    cpSync(join(story,'story.json'),join(output,'reports/story.json'));
+    const path=join(output,'reports/catalog.json'); const catalog=JSON.parse(readFileSync(path,'utf8'));
+    catalog.campaign_story={story_url:'story.json',sha256:storyLock.story_sha256,audience:'omniscient_postgame',publication_policy:storyLock.policy_version};
+    writeFileSync(path,JSON.stringify(catalog,null,2)+'\n');
+  }
   const audit={schema_version:'diplomacy_postgame_collection_stage_v1',terra_asset_sha256:terraLock.asset_sha256,files:manifest(output)};
   writeFileSync(join(output,'collection-stage.json'),JSON.stringify(audit,null,2)+'\n');return audit;
 }
@@ -81,6 +90,10 @@ export function verifyOutput(output: string, built=false) {
   const expected = new Set(['credits.html','maps/standard_clean.LICENSE.md','maps/standard_clean.svg','THIRD_PARTY_NOTICES.json',
     'release-receipts/luna.json','release-receipts/g1.json','release-receipts/g2.json','release-receipts/successor.json','reports/catalog.json',
     ...ids.map(id=>`reports/bundles/${id}/report.json`),'collection-stage.json']);
+  if(catalog.campaign_story) {
+    if(catalog.campaign_story.sha256!==storyLock.story_sha256||catalog.campaign_story.publication_policy!==storyLock.policy_version||catalog.campaign_story.story_url!=='story.json'||sha(readFileSync(join(output,'reports/story.json')))!==storyLock.story_sha256) throw new Error('Unreviewed story stage');
+    expected.add('reports/story.json');
+  }
   if(allowed.size!==expected.size || [...allowed].some(name=>!expected.has(name)) || audit.files.length!==expected.size-1) throw new Error('Unexpected stage manifest');
   for(const [g,checksum] of [['luna',lunaLock.receipt_sha256],['g1',terraLock.games.g1.receipt_sha256],['g2',terraLock.games.g2.receipt_sha256],['successor',successorLock.games.g2.receipt_sha256]])
     if(sha(readFileSync(join(output,'release-receipts',`${g}.json`)))!==checksum) throw new Error('Receipt changed');
@@ -94,5 +107,5 @@ export function verifyOutput(output: string, built=false) {
 }
 if(process.argv[1] && resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
   const [action,...args]=process.argv.slice(2);
-  console.log(JSON.stringify(action==='stage'?stage(args[0],args[1],args[2],args[3]):verifyOutput(args[0],action==='verify-build')));
+  console.log(JSON.stringify(action==='stage'?stage(args[0],args[1],args[2],args[3],args[4]):verifyOutput(args[0],action==='verify-build')));
 }
