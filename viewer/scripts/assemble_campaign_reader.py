@@ -10,6 +10,40 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def parse_blocks(body, records, games):
+    blocks = []
+    for paragraph in body.strip().split('\n\n'):
+        text = paragraph.strip()
+        if not text:
+            continue
+        quote = text.startswith('>')
+        prefixes = [text[1:].split('|', 1)[0].strip()] if quote else re.findall(r'\[([A-Za-z0-9:_-]+)\]', text)
+        refs = []
+        for prefix in prefixes:
+            if prefix in records:
+                ids = [prefix]
+            elif re.fullmatch(r'g\d+:\d{4}(?:_[a-z_]+)?', prefix):
+                number, phase = prefix.split(':')
+                game = games[int(number[1:])-1]
+                phase = phase + '_winter_adjustment' if len(phase) == 4 else phase
+                ids = [key for key, record in records.items() if record.get('kind') == 'board'
+                       and record.get('experiment_id') == game['experiment_id']
+                       and record.get('artifact_path', '').startswith(f"games/{game['source_game_id']}/")
+                       and record['artifact_path'].endswith(f'/{phase}_state.json')]
+            else:
+                ids = [key for key in records if key.startswith(prefix)]
+            if len(ids) != 1:
+                raise ValueError(f'Unresolved source: {prefix}')
+            refs.extend(ids)
+        text = text[1:].split('|', 1)[1] if quote else re.sub(r'\s*\[[A-Za-z0-9:_-]+\]', '', text)
+        if not refs:
+            raise ValueError('Every authored passage requires evidence.')
+        if quote and not any(text in records[key]['text'] for key in refs):
+            raise ValueError('Unresolved or inexact quotation.')
+        blocks.append({'kind': 'quote' if quote else 'paragraph', 'text': text, 'refs': list(dict.fromkeys(refs))})
+    return blocks
+
+
 def assemble(reader, episodes, reports, output, metadata=None):
     if output.exists():
         raise ValueError('Output already exists; choose a new edition directory.')
@@ -22,6 +56,12 @@ def assemble(reader, episodes, reports, output, metadata=None):
         records = json.loads(match[1])
     else:
         raise ValueError('Reader has no embedded evidence-data inventory.')
+    for record in records.values():
+        if record.get('kind') == 'group':
+            if not record.get('parts') or any(part not in records for part in record['parts']):
+                raise ValueError('Invalid evidence group.')
+        elif any(not isinstance(record.get(key), str) for key in ['title', 'text', 'raw', 'experiment_id', 'artifact_path', 'pointer']) or not re.fullmatch(r'[a-f0-9]{64}', record.get('sha256', '')):
+            raise ValueError('Invalid story evidence provenance; supply readable text and selected-domain raw extract.')
     games = []
     factual = {}
     for ident, path in reports:
@@ -44,45 +84,26 @@ def assemble(reader, episodes, reports, output, metadata=None):
         header, body = chunk.split('\n', 1)
         ident, number, years, title, players = header.split('|')
         game = games[int(number)-1]
-        blocks = []
-        for paragraph in body.strip().split('\n\n'):
-            text = paragraph.strip()
-            if not text:
-                continue
-            if text.startswith('>'):
-                prefix, quote = text[1:].split('|', 1)
-                ids = [k for k in records if k.startswith(prefix)]
-                if len(ids) != 1 or quote not in records[ids[0]]['text']:
-                    raise ValueError('Unresolved or inexact quotation.')
-                blocks.append({'kind': 'quote', 'text': quote, 'refs': ids})
-            else:
-                refs = []
-                for ref in re.findall(r'\[([A-Za-z0-9:_-]+)\]', text):
-                    if ref in records:
-                        refs.append(ref)
-                    elif ref.startswith('g') and ':' in ref:
-                        # Board aliases in the authored source resolve to embedded snapshot locators.
-                        n, phase = ref.split(':')
-                        bound_game = games[int(n[1:])-1]
-                        experiment = bound_game['experiment_id']
-                        if len(phase) == 4:
-                            phase += '_winter_adjustment'
-                        ids = [k for k,r in records.items() if r.get('kind') == 'board' and r.get('experiment_id') == experiment
-                               and r.get('artifact_path', '').startswith(f"games/{bound_game['source_game_id']}/")
-                               and r.get('artifact_path', '').endswith(f'/{phase}_state.json')]
-                        if len(ids) != 1:
-                            raise ValueError(f'Unresolved board alias: {ref}')
-                        refs.append(ids[0])
-                    else:
-                        ids = [k for k in records if k.startswith(ref)]
-                        if len(ids) != 1:
-                            raise ValueError(f'Unresolved source: {ref}')
-                        refs.append(ids[0])
-                blocks.append({'kind': 'paragraph', 'text': re.sub(r'\s*\[[A-Za-z0-9:_-]+\]', '', text), 'refs': list(dict.fromkeys(refs))})
+        blocks = parse_blocks(body, records, games)
         sections.append({'id': ident, 'game': game['id'], 'years': years, 'title': title, 'players': players.split(','), 'blocks': blocks})
     if not sections or len({s['id'] for s in sections}) != len(sections):
         raise ValueError('Missing or duplicate episodes.')
-    used = {r for section in sections for block in section['blocks'] for r in block['refs']}
+    portraits = []
+    for game in games:
+        introduction = (metadata or {}).get('games', {}).get(game['id'], {}).get('introduction')
+        if introduction:
+            game['introduction'] = {'title': introduction['title'], 'blocks': parse_blocks(introduction['body'], records, games)}
+    for portrait in (metadata or {}).get('portraits', []):
+        scope = [g for g in games if g['series'] == portrait['series'] and portrait['player'] in g['assignments']]
+        if not scope or any(p['series'] == portrait['series'] and p['player'] == portrait['player'] for p in portraits):
+            raise ValueError('Invalid or duplicate series/player portrait.')
+        portraits.append({k: portrait[k] for k in ['series', 'player', 'title']} | {'blocks': parse_blocks(portrait['body'], records, games)})
+    if (metadata or {}).get('editorial_complete'):
+        expected = {(g['series'], p) for g in games for p in g['assignments']}
+        if any(not g.get('introduction', {}).get('blocks') for g in games) or {(p['series'],p['player']) for p in portraits} != expected:
+            raise ValueError('Complete editions require each game introduction and series/player portrait.')
+    authored = sections + portraits + [g['introduction'] for g in games if g.get('introduction')]
+    used = {r for section in authored for block in section['blocks'] for r in block['refs']}
     used.update(part for r in list(used) for part in records[r].get('parts', []))
     records = {key:value for key,value in records.items() if value.get('kind') != 'board' or key in used}
     # Match original record locators to existing explorer targets; never use text similarity.
@@ -140,7 +161,7 @@ def assemble(reader, episodes, reports, output, metadata=None):
             raise ValueError('Incomplete or invalid game/player coverage.')
     story = {'schema_version': 'campaign_story_v1', 'title': metadata['title'],
              'subtitle': metadata['subtitle'],
-             'audience': 'omniscient_postgame', 'games': games, 'episodes': sections, 'records': records,
+             'audience': 'omniscient_postgame', 'editorial_complete': metadata.get('editorial_complete', False), 'games': games, 'episodes': sections, 'portraits': portraits, 'records': records,
              'provenance': {'reader_sha256': digest(html_bytes), 'authored_source_sha256': digest(source_bytes),
                             'exact_explorer_targets': matched,
                             'memory_note': metadata['memory_note'], 'memory_notes': metadata.get('memory_notes',{})}, 'publication_policy': metadata.get('publication_policy')}
