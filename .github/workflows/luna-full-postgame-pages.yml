@@ -46,8 +46,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh release download campaign-story-v1 --pattern campaign-story-v1.zip --dir "$RUNNER_TEMP/story-asset"
-          python publication/campaign_asset.py --asset "$RUNNER_TEMP/story-asset/campaign-story-v1.zip" --output "$RUNNER_TEMP/story-data" --lock publication/campaign-story-release-lock.json
+          gh release download campaign-story-v2 --pattern campaign-story-v2.zip --dir "$RUNNER_TEMP/story-asset"
+          python publication/campaign_asset.py --asset "$RUNNER_TEMP/story-asset/campaign-story-v2.zip" --output "$RUNNER_TEMP/story-data" --lock publication/campaign-story-release-lock.json
       - run: npm ci --ignore-scripts
         working-directory: viewer
       - name: Validate, stage and build the completed collection

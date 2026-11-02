@@ -80,6 +80,8 @@ describe('native campaign reader',()=>{
     location.hash='view=story&chapter=opening&player=first';
     render(<App initialData={data} fetcher={async()=>({ok:true,status:200,statusText:'OK',text:async()=>text})}/>);
     expect(await screen.findByRole('heading',{name:'Follow First'})).toBeVisible();
+    expect(screen.getByRole('link',{name:'Read Luna'})).toHaveAttribute('href','#view=story&chapter=opening');
+    expect(screen.getByRole('link',{name:'Read Terra'})).toHaveAttribute('href','#view=story&chapter=terra-opening');
     expect(screen.getByText('Game 1: France')).toBeVisible();
     expect(screen.queryByRole('heading',{name:/Terra game/,level:2})).toBeNull();
   });
