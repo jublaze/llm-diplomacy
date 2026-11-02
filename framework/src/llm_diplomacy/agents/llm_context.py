@@ -1064,12 +1064,18 @@ class PromptContextBuilder:
                 orders.append({"type": "SUPPORT_HOLD", "payload": {"target": target_province}})
             target_type = str(target_unit.get("type", ""))
             target_coast = target_unit.get("coast") if isinstance(target_unit.get("coast"), str) else None
-            for destination in self._legal_move_destinations(
+            target_destinations = set(self._legal_move_destinations(
                 unit_type=target_type,
                 province=target_province,
                 coast=target_coast,
-            ):
-                if destination in support_destinations:
+            ))
+            if target_type == "A":
+                target_destinations.update(
+                    self._convoy_destinations_for_army(state=state, army_province=target_province)
+                )
+            reachable_destinations = support_provinces if target_type == "A" else support_destinations
+            for destination in sorted(target_destinations):
+                if destination in reachable_destinations:
                     orders.append(
                         {
                             "type": "SUPPORT_MOVE",
