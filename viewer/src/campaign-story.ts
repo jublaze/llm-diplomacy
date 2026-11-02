@@ -4,7 +4,9 @@ import type { EvidenceTarget } from './viewer-model';
 export type StoryRecord = { kind: string; title: string; parts?: string[]; text?: string; raw?: string; context?: string; experiment_id?: string; game_id?: string; artifact_path?: string; pointer?: string; sha256?: string; bytes?: string; filename?: string; explorer?: { game: string; phase: string; target: EvidenceTarget | null } };
 export type StoryBlock = { kind: 'paragraph' | 'quote'; text: string; refs: string[] };
 export type StoryEpisode = { id: string; game: string; years: string; title: string; players: string[]; blocks: StoryBlock[] };
-export type CampaignStory = { schema_version: 'campaign_story_v1'; publication_policy?: string; title: string; subtitle: string; audience: 'omniscient_postgame'; games: { id: string; label: string; experiment_id: string; source_game_id?: string; series?: string; report_sha256: string; assignments: Record<string,string> }[]; episodes: StoryEpisode[]; records: Record<string,StoryRecord>; provenance: { reader_sha256: string; authored_source_sha256: string; memory_note: string; memory_notes?: Record<string,string> } };
+export type StorySection = { title: string; blocks: StoryBlock[] };
+export type StoryPortrait = StorySection & { series: string; player: string };
+export type CampaignStory = { schema_version: 'campaign_story_v1'; publication_policy?: string; editorial_complete?: boolean; title: string; subtitle: string; audience: 'omniscient_postgame'; games: { id: string; label: string; experiment_id: string; source_game_id?: string; series?: string; report_sha256: string; assignments: Record<string,string>; introduction?: StorySection }[]; episodes: StoryEpisode[]; portraits?: StoryPortrait[]; records: Record<string,StoryRecord>; provenance: { reader_sha256: string; authored_source_sha256: string; memory_note: string; memory_notes?: Record<string,string> } };
 export const CAMPAIGN_PUBLICATION_POLICY = 'diplomacy_campaign_story_release_v1';
 export type CampaignStoryReference = { publication_policy?: string; story_url: string; sha256: string; audience: 'omniscient_postgame' };
 
@@ -20,16 +22,32 @@ export function validateCampaignStory(value: unknown, catalog: ReportCatalogV1):
     ids.add(game.id);
   }
   const episodes = new Set<string>();
+  const checkBlocks = (blocks: StoryBlock[]) => {
+    if (!Array.isArray(blocks) || !blocks.length) throw new Error('Missing authored passages.');
+    for (const block of blocks) {
+      if (!['paragraph','quote'].includes(block.kind) || typeof block.text !== 'string' || !Array.isArray(block.refs) || !block.refs.length || block.refs.some(id => !story.records[id])) throw new Error('Unresolved story citation.');
+      if (block.kind === 'quote' && !block.refs.some(id => story.records[id].text?.includes(block.text))) throw new Error('Inexact story quotation.');
+    }
+  };
   for (const episode of story.episodes) {
     const game = story.games.find(g => g.id === episode.game);
     if (!game || !/^[a-zA-Z0-9_-]+$/.test(episode.id) || episodes.has(episode.id) || typeof episode.title !== 'string' || typeof episode.years !== 'string' || !Array.isArray(episode.players) || episode.players.some(p => !game.assignments[p]) || !Array.isArray(episode.blocks) || !episode.blocks.length) throw new Error('Invalid story episode or identity.');
     episodes.add(episode.id);
-    for (const block of episode.blocks) {
-      if (!['paragraph','quote'].includes(block.kind) || typeof block.text !== 'string' || !Array.isArray(block.refs) || !block.refs.length || block.refs.some(id => !story.records[id])) throw new Error('Unresolved story citation.');
-      if (block.kind === 'quote' && !block.refs.some(id => story.records[id].text?.includes(block.text))) throw new Error('Inexact story quotation.');
-    }
+    checkBlocks(episode.blocks);
+  }
+  const portraits = new Set<string>();
+  if (story.portraits !== undefined && !Array.isArray(story.portraits)) throw new Error('Invalid player portraits.');
+  for (const portrait of story.portraits ?? []) {
+    const key = JSON.stringify([portrait.series,portrait.player]);
+    if (typeof portrait.title !== 'string' || typeof portrait.series !== 'string' || !portrait.series || typeof portrait.player !== 'string' || !story.games.some(g=>g.series===portrait.series&&g.assignments[portrait.player]) || portraits.has(key)) throw new Error('Invalid or duplicate series/player portrait.');
+    portraits.add(key);checkBlocks(portrait.blocks);
   }
   for (const game of story.games) {
+    if (game.introduction) {
+      if (typeof game.introduction.title !== 'string') throw new Error('Invalid game introduction.');
+      checkBlocks(game.introduction.blocks);
+    }
+    if (story.editorial_complete && (!game.introduction || Object.keys(game.assignments).some(p=>!portraits.has(JSON.stringify([game.series,p]))))) throw new Error('Incomplete game introductions or player portraits.');
     const covered = new Set(story.episodes.filter(e=>e.game===game.id).flatMap(e=>e.players));
     if (Object.keys(game.assignments).some(p=>!covered.has(p))) throw new Error('Incomplete game/player coverage.');
   }
